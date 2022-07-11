@@ -8,12 +8,12 @@ uses
 
 const
 
-  //Messages:
+  // Messages:
   CM_ASIO             = WM_User + 100;
   CM_UpdateSamplePos  = CM_ASIO + 1;
   CM_NotifyOwner      = CM_UpdateSamplePos + 1;
 
-  //Constants:
+  // Constants:
   AM_ResetRequest         = 0;
   AM_BufferSwitch         = 1;
   AM_BufferSwitchTimeInfo = 2;
@@ -25,12 +25,18 @@ const
   c_nBytesInChannel = 3;
   c_nBytesInSample  = 6;
 
+  // Numerical
+  FLT_EPS = 0.000001;
+
 type
   TNotificationType = (ntBuffersCreated,
                        ntBuffersDestroyed,
                        ntBuffersUpdated,
                        ntDriverClosed,
                        ntRequestedReset);
+
+  TIntArray = Array of Integer;
+  PIntArray = ^TIntArray;
 
 implementation
 
