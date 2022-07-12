@@ -51,11 +51,6 @@ type
     procedure CreateBuffers;
     procedure DestroyBuffers;
 
-    procedure InterpolateChannels(a_CasTrack  : TCasTrack;
-                                  a_nPosition : Integer;
-                                  a_dSpeed    : Double;
-                                  a_LeftAux   : PIntArray;
-                                  a_RightAux  : PIntArray);
   public
     constructor Create(a_Owner : TObject; a_Handle : HWND = 0);
     destructor  Destroy; override;
@@ -115,6 +110,7 @@ uses
   VCL.Dialogs,
   System.Classes,
   System.SysUtils,
+  CasBasicFxU,
   Math;
 
 
@@ -410,19 +406,23 @@ procedure TCasEngine.CalculateBuffers;
 var
   nBufferIdx  : Integer;
   nPosition   : Integer;
-  dSpeed      : Double;
   nTrackIdx   : Integer;
+  nBufInSize  : Integer;
   CasTrack    : TCasTrack;
   CasMixer    : TCasMixer;
-  RightAux    : TIntArray;
-  LeftAux     : TIntArray;
+  LeftMaster  : TIntArray;
+  RightMaster : TIntArray;
+  LeftTrack   : TIntArray;
+  RightTrack  : TIntArray;
 begin
-  dSpeed    := m_CasPlaylist.Speed;
+  nBufInSize := Ceil(m_nCurrentBufferSize * m_CasPlaylist.Speed) + 1;
 
   SetLength(m_LeftBuffer,  m_nCurrentBufferSize);
   SetLength(m_RightBuffer, m_nCurrentBufferSize);
-  SetLength(RightAux,      m_nCurrentBufferSize);
-  SetLength(LeftAux,       m_nCurrentBufferSize);
+  SetLength(LeftMaster,    nBufInSize);
+  SetLength(RightMaster,   nBufInSize);
+  SetLength(LeftTrack,     nBufInSize);
+  SetLength(RightTrack,    nBufInSize);
 
   // Clear buffers:
   for nBufferIdx := 0 to m_nCurrentBufferSize - 1 do
@@ -445,17 +445,24 @@ begin
 
           // If playlist reached track's position, plays:
           if (nPosition >= 0) and
-             (nPosition < (CasTrack.Size - m_nCurrentBufferSize * dSpeed)) then
+             (nPosition < CasTrack.Size - nBufInSize) then
           begin
-            InterpolateChannels(CasTrack, nPosition, dSpeed, @LeftAux, @RightAux);
+            InterpolateRT(@(CasTrack.RawData.Left),
+                          @(CasTrack.RawData.Right),
+                          @LeftTrack,
+                          @RightTrack,
+                          nBufInSize,
+                          nBufInSize,
+                          1,
+                          nPosition);
 
-            for nBufferIdx := 0 to m_nCurrentBufferSize - 1 do
+            for nBufferIdx := 0 to nBufInSize - 1 do
             begin
-              m_LeftBuffer [nBufferIdx] := m_LeftBuffer[nBufferIdx]  +
-                Trunc(CasMixer.Level * LeftAux [nBufferIdx]);
+              LeftMaster [nBufferIdx] := LeftMaster[nBufferIdx]  +
+                Trunc(CasMixer.Level * LeftTrack [nBufferIdx]);
 
-              m_RightBuffer[nBufferIdx] := m_RightBuffer[nBufferIdx] +
-                Trunc(CasMixer.Level * RightAux[nBufferIdx]);
+              RightMaster[nBufferIdx] := RightMaster[nBufferIdx] +
+                Trunc(CasMixer.Level * RightTrack[nBufferIdx]);
             end;
           end;
         end;
@@ -463,106 +470,17 @@ begin
     end;
   end;
 
-  m_CasPlaylist.Position := m_CasPlaylist.Position + Round(dSpeed * m_nCurrentBufferSize);
-end;
+  // Interpolate whole playlist:
+  InterpolateRT(@LeftMaster,
+                @RightMaster,
+                @m_LeftBuffer,
+                @m_RightBuffer,
+                nBufInSize,
+                m_nCurrentBufferSize,
+                m_CasPlaylist.Speed,
+                0);
 
-//==============================================================================
-procedure TCasEngine.InterpolateChannels(a_CasTrack  : TCasTrack;
-                                         a_nPosition : Integer;
-                                         a_dSpeed    : Double;
-                                         a_LeftAux   : PIntArray;
-                                         a_RightAux  : PIntArray);
-var
-  p, k, r : double;
-  v : integer;
-  nBufferIdx : Integer;
-
-  AL, AR : integer;
-  auxL, auxR : integer;
-  i : integer;
-
-  new : boolean;
-  Ra : double;
-
-begin
-  r := 1 / a_dSpeed;
-  p := r;
-  v := 0;
-  new := True;
-  i := 1;
-  AL := 0;
-  AR := 0;
-  AuxL := 0;
-  AuxR := 0;
-  RA := 0;
-
-  for nBufferIdx := 0 to m_nCurrentBufferSize - 1 do
-  begin
-    if a_dSpeed < 1 then
-    begin
-      if new then
-      begin
-        Ra := Frac(r + Ra);
-        if IsZero(RA, FLT_EPS) then
-        begin
-          RA := 0;
-          TIntArray(a_LeftAux^) [nBufferIdx] := a_CasTrack.RawData.Left [a_nPosition + v];
-          TIntArray(a_RightAux^)[nBufferIdx] := a_CasTrack.RawData.Right[a_nPosition + v];
-        end;
-
-        AL := a_CasTrack.RawData.Left [a_nPosition + v + 1] - a_CasTrack.RawData.Left [a_nPosition + v];
-        AR := a_CasTrack.RawData.Right[a_nPosition + v + 1] - a_CasTrack.RawData.Right[a_nPosition + v];
-        auxL := Trunc(a_CasTrack.RawData.Left [a_nPosition + v] + a_dSpeed * AL * (1-RA));
-        auxR := Trunc(a_CasTrack.RawData.Right[a_nPosition + v] + a_dSpeed * AR * (1-RA));
-
-        TIntArray(a_LeftAux^) [nBufferIdx + 1] := auxL;
-        TIntArray(a_RightAux^)[nBufferIdx + 1] := auxR;
-        i := 1;
-        inc(v);
-        new := False;
-      end
-      else
-      begin
-        TIntArray(a_LeftAux^) [nBufferIdx + 1] := Trunc(auxL + a_dSpeed * AL * i);
-        TIntArray(a_RightAux^)[nBufferIdx + 1] := Trunc(auxR + a_dSpeed * AR * i);
-        inc(i);
-      end;
-
-      new := (i + 1 - RA) - r > FLT_EPS;
-    end
-    else if a_dSpeed > 1 then
-    begin
-      TIntArray(a_LeftAux^) [nBufferIdx] := Trunc(p * a_CasTrack.RawData.Left [a_nPosition + v]);
-      TIntArray(a_RightAux^)[nBufferIdx] := Trunc(p * a_CasTrack.RawData.Right[a_nPosition + v]);
-      k := 0;
-
-      while (1-(p+k)) > -FLT_EPS do
-      begin
-        inc(v);
-        inc(TIntArray(a_LeftAux^) [nBufferIdx], Trunc(min(1-(p+k), r) * a_CasTrack.RawData.Left [a_nPosition + v]));
-        inc(TIntArray(a_RightAux^)[nBufferIdx], Trunc(min(1-(p+k), r) * a_CasTrack.RawData.Right[a_nPosition + v]));
-
-        k := k + r;
-      end;
-
-      k := k - r;
-
-      if IsZero((1-(p+k)) - r, FLT_EPS) then
-      begin
-        inc(v);
-        p := r;
-      end
-      else
-      begin
-        p := r - (1-(p+k));
-      end;
-    end
-    else
-    begin
-      TIntArray(a_LeftAux^) [nBufferIdx] := a_CasTrack.RawData.Left [a_nPosition + nBufferIdx];
-      TIntArray(a_RightAux^)[nBufferIdx] := a_CasTrack.RawData.Right[a_nPosition + nBufferIdx];
-    end
-  end;
+  m_CasPlaylist.Position := m_CasPlaylist.Position + nBufInSize - 1;
 end;
 
 //==============================================================================
