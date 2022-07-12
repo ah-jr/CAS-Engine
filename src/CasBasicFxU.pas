@@ -16,7 +16,8 @@ procedure InterpolateRT(a_LeftIn    : PIntArray;
                         a_nInSize   : Integer;
                         a_nOutSize  : Integer;
                         a_dSpeed    : Double;
-                        a_nOffset   : Integer);
+                        a_nOffset   : Integer;
+                        a_dGap      : Double = 0);
 
 implementation
 
@@ -28,69 +29,85 @@ procedure InterpolateRT(a_LeftIn    : PIntArray;
                         a_nInSize   : Integer;
                         a_nOutSize  : Integer;
                         a_dSpeed    : Double;
-                        a_nOffset   : Integer);
+                        a_nOffset   : Integer;
+                        a_dGap      : Double = 0);
 var
-  p, k, r : double;
-  v : integer;
+  dInc       : Double;
+  dSpeedInv  : Double;
+  dDistance  : Double;
+  nIndex     : Integer;
   nBufferIdx : Integer;
-  d : Double;
 begin
-  r := 1 / a_dSpeed;
-  p := r;
-  v := 0;
-  d := r;
+  dSpeedInv := 1 / a_dSpeed;
+  nIndex    := 0;
+
+  // Initial distance from next sample is equal to the gap of samples between
+  // buffers:
+  if a_dGap <> 0 then
+    dDistance := a_dGap
+  else
+    dDistance := dSpeedInv;
 
   for nBufferIdx := 0 to a_nOutSize - 1 do
   begin
+    // When resampling to decrease pitch, each position in the output buffer
+    // receives the value of its two nearest neighbors multiplied by the
+    // inverse of their distances:
     if a_dSpeed < 1 then
     begin
-      if (v + 1) < a_nInSize then
+      if (a_nOffset + nIndex + 1) < a_nInSize then
       begin
-        TIntArray(a_LeftOut^) [nBufferIdx] := Trunc(TIntArray(a_LeftIn^) [a_nOffset + v    ] * ((    d) * a_dSpeed) +
-                                                    TIntArray(a_LeftIn^) [a_nOffset + v + 1] * ((r - d) * a_dSpeed));
+        TIntArray(a_LeftOut^) [nBufferIdx] := Trunc(TIntArray(a_LeftIn^) [a_nOffset + nIndex    ] * ((            dDistance) * a_dSpeed) +
+                                                    TIntArray(a_LeftIn^) [a_nOffset + nIndex + 1] * ((dSpeedInv - dDistance) * a_dSpeed));
 
-        TIntArray(a_RightOut^)[nBufferIdx] := Trunc(TIntArray(a_RightIn^)[a_nOffset + v    ] * ((    d) * a_dSpeed) +
-                                                    TIntArray(a_RightIn^)[a_nOffset + v + 1] * ((r - d) * a_dSpeed));
-        d := d - 1;
+        TIntArray(a_RightOut^)[nBufferIdx] := Trunc(TIntArray(a_RightIn^)[a_nOffset + nIndex    ] * ((            dDistance) * a_dSpeed) +
+                                                    TIntArray(a_RightIn^)[a_nOffset + nIndex + 1] * ((dSpeedInv - dDistance) * a_dSpeed));
+        dDistance := dDistance - 1;
 
-        if d < 0 then
+        if dDistance < 0 then
         begin
-          inc(v);
-          d := r + d;
+          Inc(nIndex);
+          dDistance := dSpeedInv + dDistance;
         end;
       end
     end
+    // When resampling to increase pitch, each position in the output buffer
+    // receives the mean of the samples within that range:
     else if a_dSpeed > 1 then
     begin
-      TIntArray(a_LeftOut^) [nBufferIdx] := Trunc(p * TIntArray(a_LeftIn^) [a_nOffset + v]);
-      TIntArray(a_RightOut^)[nBufferIdx] := Trunc(p * TIntArray(a_RightIn^)[a_nOffset + v]);
-      k := 0;
-
-      while (1-(p+k)) > -FLT_EPS do
+      if (a_nOffset + nIndex) < a_nInSize then
       begin
-        inc(v);
-        inc(TIntArray(a_LeftOut^) [nBufferIdx], Trunc(min(1-(p+k), r) * TIntArray(a_LeftIn^) [a_nOffset + v]));
-        inc(TIntArray(a_RightOut^)[nBufferIdx], Trunc(min(1-(p+k), r) * TIntArray(a_RightIn^)[a_nOffset + v]));
+        TIntArray(a_LeftOut^) [nBufferIdx] := Trunc(dDistance * TIntArray(a_LeftIn^) [a_nOffset + nIndex]);
+        TIntArray(a_RightOut^)[nBufferIdx] := Trunc(dDistance * TIntArray(a_RightIn^)[a_nOffset + nIndex]);
+      end;
+      dInc := 0;
 
-        k := k + r;
+      while (1 - (dDistance + dInc)) > -FLT_EPS do
+      begin
+        Inc(nIndex);
+        if (a_nOffset + nIndex) < a_nInSize then
+        begin
+          Inc(TIntArray(a_LeftOut^) [nBufferIdx], Trunc(min(1 - (dDistance + dInc), dSpeedInv) * TIntArray(a_LeftIn^) [a_nOffset + nIndex]));
+          Inc(TIntArray(a_RightOut^)[nBufferIdx], Trunc(min(1 - (dDistance + dInc), dSpeedInv) * TIntArray(a_RightIn^)[a_nOffset + nIndex]));
+        end;
+        dInc := dInc + dSpeedInv;
       end;
 
-      k := k - r;
+      dInc := dInc - dSpeedInv;
 
-      if IsZero((1-(p+k)) - r, FLT_EPS) then
-      begin
-        inc(v);
-        p := r;
-      end
-      else
-      begin
-        p := r - (1-(p+k));
-      end;
+      if IsZero((1 - (dDistance + dInc)) - dSpeedInv, FLT_EPS) then
+        Inc(nIndex);
+
+      dDistance := dSpeedInv - (1 - (dDistance + dInc));
     end
+    // If there's no speed change, simply copy values to the output buffer:
     else
     begin
-      TIntArray(a_LeftOut^) [nBufferIdx] := TIntArray(a_LeftIn^) [a_nOffset + nBufferIdx];
-      TIntArray(a_RightOut^)[nBufferIdx] := TIntArray(a_RightIn^)[a_nOffset + nBufferIdx];
+      if (a_nOffset + nBufferIdx) < a_nInSize then
+      begin
+        TIntArray(a_LeftOut^) [nBufferIdx] := TIntArray(a_LeftIn^) [a_nOffset + nBufferIdx];
+        TIntArray(a_RightOut^)[nBufferIdx] := TIntArray(a_RightIn^)[a_nOffset + nBufferIdx];
+      end;
     end
   end;
 end;

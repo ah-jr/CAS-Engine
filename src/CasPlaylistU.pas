@@ -12,7 +12,7 @@ type
   TCasPlaylist = class
 
   private
-    m_nPosition : Integer;
+    m_dPosition : Double;
     m_dSpeed    : Double;
     m_lstTracks : TList<Integer>;
 
@@ -20,6 +20,7 @@ type
 
     function GetProgress : Double;
     function GetLength   : Integer;
+    function GetPosition : Integer;
 
     procedure SetPosition(a_nPosition : Integer);
 
@@ -32,7 +33,8 @@ type
     procedure ClearTracks;
 
     property Progress    : Double   read GetProgress;
-    property Position    : Integer  read m_nPosition   write SetPosition;
+    property Position    : Integer  read GetPosition   write SetPosition;
+    property RelPos      : Double   read m_dPosition   write m_dPosition;
     property Length      : Integer  read GetLength;
     property Speed       : Double   read m_dSpeed      write m_dSpeed;
 
@@ -48,7 +50,7 @@ uses
 //==============================================================================
 constructor TCasPlaylist.Create(a_CasDatabase: TCasDatabase);
 begin
-  m_nPosition   := 0;
+  m_dPosition   := 0;
   m_dSpeed      := 1;
   m_CasDatabase := a_CasDatabase;
   m_lstTracks   := TList<Integer>.Create;
@@ -63,15 +65,21 @@ begin
 end;
 
 //==============================================================================
+function TCasPlaylist.GetPosition : Integer;
+begin
+  Result := Ceil(m_dPosition);
+end;
+
+//==============================================================================
 procedure TCasPlaylist.SetPosition(a_nPosition : Integer);
 begin
-  m_nPosition := Min(Max(0, a_nPosition), GetLength);
+  m_dPosition := Min(Max(0, a_nPosition), GetLength);
 end;
 
 //==============================================================================
 function TCasPlaylist.GetProgress : Double;
 begin
-  Result := m_nPosition / GetLength;
+  Result := m_dPosition / GetLength;
 end;
 
 //==============================================================================

@@ -111,6 +111,7 @@ uses
   System.Classes,
   System.SysUtils,
   CasBasicFxU,
+  CasUtilsU,
   Math;
 
 
@@ -408,6 +409,7 @@ var
   nPosition   : Integer;
   nTrackIdx   : Integer;
   nBufInSize  : Integer;
+  dGap        : Double;
   CasTrack    : TCasTrack;
   CasMixer    : TCasMixer;
   LeftMaster  : TIntArray;
@@ -415,7 +417,12 @@ var
   LeftTrack   : TIntArray;
   RightTrack  : TIntArray;
 begin
-  nBufInSize := Ceil(m_nCurrentBufferSize * m_CasPlaylist.Speed) + 1;
+  // The gap variable is used in order to prevent distortion when changing the
+  // speed of playlist. It enables the interpolation algorithm to determine
+  // which value goes first in the buffer.
+  dGap := (1-Frac(m_CasPlaylist.RelPos))/m_CasPlaylist.Speed;
+
+  nBufInSize := Ceil((m_nCurrentBufferSize - dGap) * m_CasPlaylist.Speed) + 2;
 
   SetLength(m_LeftBuffer,  m_nCurrentBufferSize);
   SetLength(m_RightBuffer, m_nCurrentBufferSize);
@@ -441,7 +448,7 @@ begin
         // If track's position is positive, it's in the playlist:
         if (CasTrack.Position >= 0) then
         begin
-          nPosition := m_CasPlaylist.Position - CasTrack.Position;
+          nPosition := Trunc(m_CasPlaylist.RelPos) - CasTrack.Position;
 
           // If playlist reached track's position, plays:
           if (nPosition >= 0) and
@@ -451,7 +458,7 @@ begin
                           @(CasTrack.RawData.Right),
                           @LeftTrack,
                           @RightTrack,
-                          nBufInSize,
+                          CasTrack.Size,
                           nBufInSize,
                           1,
                           nPosition);
@@ -478,9 +485,10 @@ begin
                 nBufInSize,
                 m_nCurrentBufferSize,
                 m_CasPlaylist.Speed,
-                0);
+                0,
+                dGap);
 
-  m_CasPlaylist.Position := m_CasPlaylist.Position + nBufInSize - 1;
+  m_CasPlaylist.RelPos := m_CasPlaylist.RelPos + m_nCurrentBufferSize * m_CasPlaylist.Speed;
 end;
 
 //==============================================================================
