@@ -10,8 +10,7 @@ const
 
   // Messages:
   CM_ASIO             = WM_User + 100;
-  CM_UpdateSamplePos  = CM_ASIO + 1;
-  CM_NotifyOwner      = CM_UpdateSamplePos + 1;
+  CM_NotifyOwner      = CM_ASIO + 1;
 
   // Constants:
   AM_ResetRequest         = 0;

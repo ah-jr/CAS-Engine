@@ -1,0 +1,40 @@
+==============================================================================
+CAS-Engine's PATCH NOTES 
+==============================================================================
+
+v1.3:
+
+  - Added Patch Notes.
+  - Removed OpenAsio.dll usage, by utilizing Florent Ouchet's asm code that 
+    enables Delphi to compile ASIO functions correctly.
+    The OpenAsio unit was created because the ASIO SDK by Steinberg declares
+    a interface whose calling convention is not supported by 32bit Delphi,
+    but now we can simply use TOpenASIO class in Asio.pas which utilizes asm
+    lines to fix the issue. 
+
+v1.2:
+
+  - General code organization and commentary.
+  - Changing the position variable of the playlist to a double type, in order
+    to further reduce distortion in the output sound and improve the quality
+    of resampling.
+
+v1.1:
+
+  - Creation on new Unit "CasBasicFxU", containing the interpolation algorithm
+  - Major improvement of the interpolation algorithm. No more clicks heard in
+    the playback.
+ 
+
+v1.1a:
+
+  - Creation of a interpolation algorithm for resampling audio in real time.
+    The algorithm should not be trusted in this version, the output audio
+    contains clicks and noticible distortion.
+
+
+v1.0:  
+
+  - Project created from the audio engine running "CAS-AudioPlayer". 
+
+

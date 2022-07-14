@@ -12,7 +12,6 @@ uses
   CasDatabaseU,
   CasPlaylistU,
   AsioList,
-  OpenAsio,
   Asio;
 
 type
@@ -36,7 +35,7 @@ type
     m_RightBuffer                : TIntArray;
     m_LeftBuffer                 : TIntArray;
 
-    m_AsioDriver                 : IOpenAsio;
+    m_AsioDriver                 : TOpenAsio;
     m_DriverList                 : TAsioDriverList;
     m_Callbacks                  : TASIOCallbacks;
     m_BufferInfo                 : PAsioBufferInfo;
@@ -94,7 +93,7 @@ type
 
     property Playlist   : TCasPlaylist read m_CasPlaylist write m_CasPlaylist;
     property Database   : TCasDatabase read m_CasDatabase write m_CasDatabase;
-    property AsioDriver : IOpenAsio    read m_AsioDriver  write m_AsioDriver;
+    property AsioDriver : TOpenAsio    read m_AsioDriver  write m_AsioDriver;
 
     property BufferTime : TAsioTime read m_BufferTime write m_BufferTime;
     property Handle     : HWND      read m_hwndHandle write m_hwndHandle;
@@ -194,6 +193,8 @@ end;
 //==============================================================================
 destructor TCasEngine.Destroy;
 begin
+  if m_AsioDriver <> nil then
+    m_AsioDriver.Destroy;
   DestroyWindow(m_hwndHandle);
   inherited;
 end;
@@ -283,11 +284,11 @@ begin
 
   if a_nID >= 0 then
   begin
-    if OpenAsioCreate(m_DriverList[a_nID].Id, m_AsioDriver) then
-      if (m_AsioDriver <> nil) then
-        if not Succeeded(m_AsioDriver.Init(Handle))
-          then m_AsioDriver := nil
-          else CreateBuffers;
+    m_AsioDriver := TOpenAsio.Create(m_DriverList[a_nID].Id);
+    if (m_AsioDriver <> nil) then
+      if not Succeeded(m_AsioDriver.Init(Handle))
+        then m_AsioDriver := nil
+        else CreateBuffers;
   end;
 end;
 
@@ -295,10 +296,8 @@ end;
 procedure TCasEngine.ProcessMessage(var MsgRec: TMessage);
 begin
   try
-//    Case MsgRec.Msg of
-//      //
-//    else
-//      //
+//    case MsgRec.Msg of
+//
 //    end;
   finally
 
@@ -391,7 +390,6 @@ begin
       Inc(Info);
     end;
 
-    PostMessage(Handle, CM_UpdateSamplePos, Params.TimeInfo.SamplePosition.Hi, Params.TimeInfo.SamplePosition.Lo);
     m_AsioDriver.OutputReady;
   end
   else
@@ -399,7 +397,7 @@ begin
     m_CasPlaylist.Position := 0;
   end;
 
-  NotifyOwner(ntBuffersUpdated);
+  //NotifyOwner(ntBuffersUpdated);
 end;
 
 //==============================================================================
