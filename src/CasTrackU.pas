@@ -22,7 +22,7 @@ type
     m_dLevel    : Double;
     m_RawData   : PRawData;
 
-    procedure Normalize;
+    //procedure Normalize;
     function  GetSize : Integer;
 
 
@@ -49,7 +49,7 @@ uses
 //==============================================================================
 constructor TCasTrack.Create;
 begin
-  m_nID       := 0;
+  m_nID       := -1;
   m_strTitle  := '';
   m_nPosition := -1;
   m_dLevel    := 1;
@@ -60,15 +60,14 @@ destructor TCasTrack.Destroy;
 begin
   SetLength(m_RawData.Left,  0);
   SetLength(m_RawData.Right, 0);
-
-  Inherited;
+  m_nPosition := -1;
 end;
 
-//==============================================================================
-procedure TCasTrack.Normalize;
-begin
-  // WIP
-end;
+////==============================================================================
+//procedure TCasTrack.Normalize;
+//begin
+//  // WIP
+//end;
 
 //==============================================================================
 function TCasTrack.GetSize : Integer;

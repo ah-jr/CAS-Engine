@@ -2,6 +2,11 @@
 CAS-Engine's PATCH NOTES 
 ==============================================================================
 
+v1.4:
+
+  - Removed PostMessage inside audio callback in order to fix audio glitches.
+  - Added a timer that updates the owner every 10ms. 
+
 v1.3:
 
   - Added Patch Notes.

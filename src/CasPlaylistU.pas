@@ -78,8 +78,15 @@ end;
 
 //==============================================================================
 function TCasPlaylist.GetProgress : Double;
+var
+  nLength : Integer;
 begin
-  Result := m_dPosition / GetLength;
+  nLength := GetLength;
+
+  if nLength > 0 then
+    Result := m_dPosition / GetLength
+  else
+    Result := 0;
 end;
 
 //==============================================================================

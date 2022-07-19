@@ -12,7 +12,8 @@ uses
   CasDatabaseU,
   CasPlaylistU,
   AsioList,
-  Asio;
+  Asio,
+  VCL.ExtCtrls;
 
 type
   TCasEngine = class(TObject)
@@ -22,15 +23,18 @@ type
     m_hwndOwner                  : HWND;
     m_Owner                      : TObject;
     m_MainMixer                  : TCasMixer;
+    m_tmrUpdateInfo              : TTimer;
 
     m_CasDatabase                : TCasDatabase;
     m_CasPlaylist                : TCasPlaylist;
 
+    m_nIdCount                   : Integer;
     m_nCurrentBufferSize         : Integer;
     m_bBlockBufferPositionUpdate : Boolean;
     m_bFileLoaded                : Boolean;
     m_bBuffersCreated            : Boolean;
     m_bIsStarted                 : Boolean;
+    m_bOwnerUpToDate             : Boolean;
 
     m_RightBuffer                : TIntArray;
     m_LeftBuffer                 : TIntArray;
@@ -42,7 +46,7 @@ type
     m_BufferTime                 : TAsioTime;
     m_ChannelInfos               : Array[0..1] of TASIOChannelInfo;
 
-
+    procedure OnUpdateInfoTimer(Sender: TObject);
     procedure ProcessMessage(var MsgRec: TMessage);
     procedure InitializeVariables;
     procedure CloseDriver;
@@ -66,6 +70,8 @@ type
     function  GetLength     : Integer;
     function  GetReady      : Boolean;
     function  GetSampleRate : Double;
+
+    function  GenerateID    : Integer;
 
     procedure SetLevel   (a_dLevel : Double);
     procedure SetPosition(a_nPosition : Integer);
@@ -94,6 +100,7 @@ type
     property Playlist   : TCasPlaylist read m_CasPlaylist write m_CasPlaylist;
     property Database   : TCasDatabase read m_CasDatabase write m_CasDatabase;
     property AsioDriver : TOpenAsio    read m_AsioDriver  write m_AsioDriver;
+    property MainMixer  : TCasMixer    read m_MainMixer   write m_MainMixer;
 
     property BufferTime : TAsioTime read m_BufferTime write m_BufferTime;
     property Handle     : HWND      read m_hwndHandle write m_hwndHandle;
@@ -186,6 +193,7 @@ begin
   m_Owner     := a_Owner;
   m_hwndOwner := a_Handle;
   CasEngine   := Self;
+  m_nIdCount  := 0;
 
   InitializeVariables;
 end;
@@ -196,13 +204,22 @@ begin
   if m_AsioDriver <> nil then
     m_AsioDriver.Destroy;
   DestroyWindow(m_hwndHandle);
-  inherited;
+
+  m_tmrUpdateInfo.Enabled := False;
+  m_tmrUpdateInfo.Free;
+
+  Inherited;
 end;
 
 //==============================================================================
 procedure TCasEngine.InitializeVariables;
 begin
   m_hwndHandle := AllocateHWnd(ProcessMessage);
+
+  m_tmrUpdateInfo := TTimer.Create(nil);
+  m_tmrUpdateInfo.Interval := 10;
+  m_tmrUpdateInfo.OnTimer := OnUpdateInfoTimer;
+  m_tmrUpdateInfo.Enabled := True;
 
   m_CasDatabase := TCasDatabase.Create;
   m_CasPlaylist := TCasPlaylist.Create(m_CasDatabase);
@@ -225,9 +242,21 @@ begin
   m_bBuffersCreated            := False;
   m_bIsStarted                 := False;
   m_bBlockBufferPositionUpdate := False;
+  m_bOwnerUpToDate             := True;
 
   SetLength(m_DriverList, 0);
   ListAsioDrivers(m_DriverList);
+end;
+
+//==============================================================================
+procedure TCasEngine.OnUpdateInfoTimer(Sender: TObject);
+begin
+  if not m_bOwnerUpToDate then
+  begin
+    NotifyOwner(ntBuffersUpdated);
+
+    m_bOwnerUpToDate := True;
+  end;
 end;
 
 //==============================================================================
@@ -397,7 +426,7 @@ begin
     m_CasPlaylist.Position := 0;
   end;
 
-  //NotifyOwner(ntBuffersUpdated);
+  m_bOwnerUpToDate := False;
 end;
 
 //==============================================================================
@@ -406,6 +435,8 @@ var
   nBufferIdx  : Integer;
   nPosition   : Integer;
   nTrackIdx   : Integer;
+  nTrackID    : Integer;
+  nMixerIdx   : Integer;
   nBufInSize  : Integer;
   dGap        : Double;
   CasTrack    : TCasTrack;
@@ -437,13 +468,15 @@ begin
   end;
 
   // For each mixer, get all linked tracks and add them to the buffer:
-  for CasMixer in m_CasDatabase.Mixers do
+  for nMixerIdx := 0 to m_CasDatabase.Mixers.Count - 1 do
   begin
-    for nTrackIdx in CasMixer.Tracks do
+    CasMixer := m_CasDatabase.Mixers.Items[nMixerIdx];
+    for nTrackIdx := 0 to CasMixer.Tracks.Count - 1 do
     begin
-      if m_CasDatabase.GetTrackById(nTrackIdx, CasTrack) then
+      nTrackID := CasMixer.Tracks.Items[nTrackIdx];
+      if m_CasDatabase.GetTrackById(nTrackID, CasTrack) then
       begin
-        // If track's position is positive, it's in the playlist:
+        // If track's position is positive a is in the playlist:
         if (CasTrack.Position >= 0) then
         begin
           nPosition := Trunc(m_CasPlaylist.RelPos) - CasTrack.Position;
@@ -601,6 +634,15 @@ begin
     Pause;
     m_CasPlaylist.Position := 0;
   end;
+end;
+
+//==============================================================================
+// Generate ID's for any CAS object
+//==============================================================================
+function TCasEngine.GenerateID : Integer;
+begin
+  Result := m_nIdCount;
+  Inc(m_nIdCount);
 end;
 
 //==============================================================================
