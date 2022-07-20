@@ -63,6 +63,8 @@ type
     procedure Play;
     procedure Pause;
     procedure Stop;
+    procedure Prev;
+    procedure Next;
 
     function  GetLevel      : Double;
     function  GetPosition   : Integer;
@@ -633,6 +635,46 @@ begin
   begin
     Pause;
     m_CasPlaylist.Position := 0;
+  end;
+end;
+
+//==============================================================================
+procedure TCasEngine.Prev;
+var
+  nIndex : Integer;
+  nPos   : Integer;
+begin
+  if m_AsioDriver <> nil then
+  begin
+    nPos := 0;
+
+    for nIndex := 0 to m_CasDatabase.Tracks.Count - 1 do
+    begin
+      if (m_CasDatabase.Tracks.Items[nIndex].Position < m_CasPlaylist.Position) then
+        nPos := Max(nPos, m_CasDatabase.Tracks.Items[nIndex].Position);
+    end;
+
+    m_CasPlaylist.Position := nPos;
+  end;
+end;
+
+//==============================================================================
+procedure TCasEngine.Next;
+var
+  nIndex : Integer;
+  nPos   : Integer;
+begin
+  if m_AsioDriver <> nil then
+  begin
+    nPos := MaxInt;
+
+    for nIndex := 0 to m_CasDatabase.Tracks.Count - 1 do
+    begin
+      if (m_CasDatabase.Tracks.Items[nIndex].Position > m_CasPlaylist.Position) then
+        nPos := Min(nPos, m_CasDatabase.Tracks.Items[nIndex].Position);
+    end;
+
+    m_CasPlaylist.Position := nPos;
   end;
 end;
 

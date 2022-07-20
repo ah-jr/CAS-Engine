@@ -25,10 +25,10 @@ type
     //procedure Normalize;
     function  GetSize : Integer;
 
-
   public
     constructor Create;
     destructor  Destroy; override;
+    function  Clone   : TCasTrack;
 
     property ID          : Integer  read m_nID         write m_nID;
     property Title       : String   read m_strTitle    write m_strTitle;
@@ -53,14 +53,38 @@ begin
   m_strTitle  := '';
   m_nPosition := -1;
   m_dLevel    := 1;
+  RawData     := nil;
 end;
 
 //==============================================================================
 destructor TCasTrack.Destroy;
 begin
-  SetLength(m_RawData.Left,  0);
-  SetLength(m_RawData.Right, 0);
-  m_nPosition := -1;
+  if RawData <> nil then
+  begin
+    SetLength(m_RawData.Left,  0);
+    SetLength(m_RawData.Right, 0);
+  end;
+end;
+
+//==============================================================================
+function TCasTrack.Clone : TCasTrack;
+var
+  pData : PRawData;
+begin
+  Result       := TCasTrack.Create;
+  Result.ID    := -1;
+  Result.Title := m_strTitle;
+  Result.Level := m_dLevel;
+
+  New(pData);
+
+  SetLength(pData.Left,  GetSize);
+  SetLength(pData.Right, GetSize);
+
+  Move(m_RawData.Left [0], pData.Left [0], GetSize * SizeOf(Integer));
+  Move(m_RawData.Right[0], pData.Right[0], GetSize * SizeOf(Integer));
+
+  Result.RawData := pData;
 end;
 
 ////==============================================================================
@@ -79,7 +103,6 @@ begin
   else
     Result := 0;
 end;
-
 
 end.
 

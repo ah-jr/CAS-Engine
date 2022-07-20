@@ -2,6 +2,12 @@
 CAS-Engine's PATCH NOTES 
 ==============================================================================
 
+v1.5
+
+  - Created clone procedure for TCasTrack.
+  - Fixed possible invalid memory access in TCasTrack.Destroy. 
+  - New 'previous' and 'next' functionalities in TCasPlaylist
+
 v1.4:
 
   - Removed PostMessage inside audio callback in order to fix audio glitches.
