@@ -25,7 +25,9 @@ const
   c_nBytesInSample  = 6;
 
   // Numerical
-  FLT_EPS = 0.000001;
+  FLT_EPS    = 0.000001;
+  HOUR_SEC   = 3600;
+  MINUTE_SEC = 60;
 
 type
   TNotificationType = (ntBuffersCreated,
@@ -33,6 +35,11 @@ type
                        ntBuffersUpdated,
                        ntDriverClosed,
                        ntRequestedReset);
+
+  TSecondSplit = (spMilliSeconds,
+                  spCentiSeconds,
+                  spDeciSeconds,
+                  spNone);
 
   TIntArray = Array of Integer;
   PIntArray = ^TIntArray;

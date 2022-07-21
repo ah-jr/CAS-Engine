@@ -1,0 +1,10 @@
+*.exe
+*.dcu
+*.res
+*.identcache
+*.local
+__history/
+*.raw
+
+!bin/ffmpeg/*.exe
+!bin/ffmpeg/*.dll

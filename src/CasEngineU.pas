@@ -72,6 +72,8 @@ type
     function  GetLength     : Integer;
     function  GetReady      : Boolean;
     function  GetSampleRate : Double;
+    function  GetTime       : String;
+    function  GetDuration   : String;
 
     function  GenerateID    : Integer;
 
@@ -93,6 +95,8 @@ type
     property Position   : Integer   read GetPosition  write SetPosition;
     property Progress   : Double    read GetProgress;
     property Length     : Integer   read GetLength;
+    property Time       : String    read GetTime;
+    property Duration   : String    read GetDuration;
 
     property Ready      : Boolean   read GetReady;
     property Playing    : Boolean   read m_bIsStarted;
@@ -728,6 +732,28 @@ begin
       Result := 0;
     end;
   end;
+end;
+
+//==============================================================================
+function TCasEngine.GetTime : String;
+var
+  dSampleRate : Double;
+begin
+  dSampleRate := GetSampleRate;
+
+  if dSampleRate > 0 then
+    Result := TimeString(Trunc(1000 * (m_CasPlaylist.Position / dSampleRate)));
+end;
+
+//==============================================================================
+function TCasEngine.GetDuration : String;
+var
+  dSampleRate : Double;
+begin
+  dSampleRate := GetSampleRate;
+
+  if dSampleRate > 0 then
+    Result := TimeString(Trunc(1000 * (m_CasPlaylist.Length / dSampleRate)));
 end;
 
 //==============================================================================
