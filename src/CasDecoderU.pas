@@ -28,9 +28,9 @@ type
     constructor Create;
     destructor Destroy; override;
 
-    function CreateTrack    (a_aobInputPCMData : TBytes) : TCasTrack;
-    function DecodeFile     (a_strFileName : String; a_dSampleRate : Double) : TCasTrack;
-    function AsyncDecodeFile(a_hwndCaller : HWND; a_lstFiles : TStrings; a_dSampleRate : Double) : TCasTrack;
+    function  CreateTrack    (a_aobInputPCMData : TBytes) : TCasTrack;
+    function  DecodeFile     (a_strFileName : String; a_dSampleRate : Double) : TCasTrack;
+    procedure AsyncDecodeFile(a_hwndCaller : HWND; a_lstFiles : TStrings; a_dSampleRate : Double);
 
     property Tracks : TList<TCasTrack> read m_lstCasTracks write m_lstCasTracks;
 
@@ -91,9 +91,7 @@ begin
 end;
 
 //==============================================================================
-function TCasDecoder.AsyncDecodeFile(a_hwndCaller : HWND; a_lstFiles : TStrings; a_dSampleRate : Double) : TCasTrack;
-var
-  strFileName : String;
+procedure TCasDecoder.AsyncDecodeFile(a_hwndCaller : HWND; a_lstFiles : TStrings; a_dSampleRate : Double);
 begin
   m_dSampleRate := a_dSampleRate;
   m_hwndCaller  := a_hwndCaller;
