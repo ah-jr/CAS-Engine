@@ -11,6 +11,7 @@ const
   // Messages:
   CM_ASIO             = WM_User + 100;
   CM_NotifyOwner      = CM_ASIO + 1;
+  CM_NotifyDecode     = CM_ASIO + 2;
 
   // Constants:
   AM_ResetRequest         = 0;
