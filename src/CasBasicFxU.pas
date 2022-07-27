@@ -7,6 +7,7 @@ uses
   Winapi.Messages,
   Math,
   CasTrackU,
+  CasTypesU,
   CasConstantsU;
 
 procedure InterpolateRT(a_LeftIn    : PIntArray;

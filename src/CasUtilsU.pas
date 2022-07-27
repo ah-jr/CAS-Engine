@@ -7,6 +7,7 @@ uses
   Winapi.Messages,
   Math,
   CasTrackU,
+  CasTypesU,
   CasConstantsU;
 
   function BoolToInt(a_bBool : Boolean) : Integer;

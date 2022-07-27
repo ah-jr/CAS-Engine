@@ -7,17 +7,17 @@ uses
   Winapi.Messages,
   System.Generics.Collections,
   CasConstantsU,
-  CasEngineU,
+  CasTypesU,
   AsioList,
   Asio,
   VCL.ExtCtrls;
 
 type
-  TCasAsio = class(TObject)
+  TCasAsio = class(TInterfacedObject, IAudioDriver)
 
   private
     m_hwndHandle                 : HWND;
-    m_CasEngine                  : TCasEngine;
+    m_CasEngine                  : TObject;
 
     m_bBuffersCreated            : Boolean;
     m_bIsStarted                 : Boolean;
@@ -34,11 +34,16 @@ type
     m_ChannelInfos               : Array[0..1] of TASIOChannelInfo;
 
     procedure InitializeVariables;
+    procedure CreateBuffers;
+    procedure DestroyBuffers;
+
+    function  GetPlaying    : Boolean;
     function  GetReady      : Boolean;
     function  GetSampleRate : Double;
+    function  GetBufferSize : Cardinal;
 
   public
-    constructor Create(a_Owner : TCasEngine);
+    constructor Create(a_Owner : TObject);
     destructor  Destroy; override;
 
     procedure BufferSwitch         (a_nIndex : Integer);
@@ -49,16 +54,13 @@ type
     procedure Pause;
     procedure Stop;
 
+    procedure InitDriver(a_nID : Integer);
     procedure CloseDriver;
-    procedure CreateBuffers;
-    procedure DestroyBuffers;
-    procedure ChangeDriver(a_nID : Integer);
+    procedure NotifyOwner  (a_ntNotification : TNotificationType);
 
-    property Driver     : TOpenAsio read m_AsioDriver write m_AsioDriver;
     property BufferTime : TAsioTime read m_BufferTime write m_BufferTime;
     property Handle     : HWND      read m_hwndHandle write m_hwndHandle;
 
-    property BuffersOn  : Boolean   read m_bBuffersCreated;
     property Playing    : Boolean   read m_bIsStarted;
     property Ready      : Boolean   read GetReady;
     property SampleRate : Double    read GetSampleRate;
@@ -75,6 +77,7 @@ uses
   VCL.Dialogs,
   System.Classes,
   System.SysUtils,
+  CasEngineU,
   Math;
 
 
@@ -145,9 +148,10 @@ begin
 end;
 
 //==============================================================================
-constructor TCasAsio.Create(a_Owner : TCasEngine);
+constructor TCasAsio.Create(a_Owner : TObject);
 begin
-  m_CasEngine := a_Owner;
+  if a_Owner is TCasEngine then
+    m_CasEngine := a_Owner;
 
   InitializeVariables;
 end;
@@ -191,7 +195,7 @@ var
    inp, outp: integer;
 begin
   case Message.WParam of
-    AM_ResetRequest         :  m_CasEngine.NotifyOwner(ntRequestedReset);
+    AM_ResetRequest         :  NotifyOwner(ntRequestedReset);
     AM_BufferSwitch         :  BufferSwitch(Message.LParam);
     AM_BufferSwitchTimeInfo :  BufferSwitchTimeInfo(Message.LParam, m_BufferTime);
     AM_LatencyChanged       :
@@ -219,8 +223,12 @@ var
   nChannelIdx              : Integer;
   nBufferIdx               : Integer;
   OutputInt32              : PInteger;
+  Info                     : PAsioBufferInfo;
 begin
-  //m_CasEngine.CalculateBuffers(@m_LeftBuffer, @m_RightBuffer);
+  if m_CasEngine is TCasEngine then
+    (m_CasEngine as TCasEngine).CalculateBuffers(@m_LeftBuffer, @m_RightBuffer);
+
+  Info := m_BufferInfo;
 
   for nChannelIdx := 0 to c_nChannelCount - 1 do
   begin
@@ -240,7 +248,7 @@ begin
       ASIOSTInt24LSB   : ;
       ASIOSTInt32LSB   :
         begin
-          OutputInt32 := m_BufferInfo^.Buffers[a_nIndex];
+          OutputInt32 := Info^.Buffers[a_nIndex];
           for nBufferIdx := 0 to m_nCurrentBufferSize-1 do
           begin
             if nChannelIdx = 0 then
@@ -263,14 +271,21 @@ begin
       ASIOSTInt32LSB24 : ;
     end;
 
-    Inc(m_BufferInfo);
+    Inc(Info);
   end;
 
   m_AsioDriver.OutputReady;
 end;
 
 //==============================================================================
-procedure TCasAsio.ChangeDriver(a_nID : Integer);
+procedure TCasAsio.NotifyOwner(a_ntNotification : TNotificationType);
+begin
+  if (m_CasEngine is TCasEngine) then
+    (m_CasEngine as TCasEngine).NotifyOwner(a_ntNotification);
+end;
+
+//==============================================================================
+procedure TCasAsio.InitDriver(a_nID : Integer);
 begin
   if m_AsioDriver <> nil then
     CloseDriver;
@@ -313,12 +328,11 @@ begin
     end;
 
     m_bBuffersCreated := (m_AsioDriver.CreateBuffers(m_BufferInfo, c_nChannelCount, nPref, m_Callbacks) = ASE_OK);
-    if m_bBuffersCreated then
-      m_nCurrentBufferSize := nPref
-    else
-      m_nCurrentBufferSize := 0;
+    if m_bBuffersCreated
+      then m_nCurrentBufferSize := nPref
+      else m_nCurrentBufferSize := 0;
 
-    m_CasEngine.NotifyOwner(ntBuffersCreated);
+    NotifyOwner(ntBuffersCreated);
 
     if m_AsioDriver <> nil then
     begin
@@ -347,7 +361,7 @@ begin
     m_bBuffersCreated    := False;
     m_nCurrentBufferSize := 0;
 
-    m_CasEngine.NotifyOwner(ntBuffersDestroyed);
+    NotifyOwner(ntBuffersDestroyed);
   end;
 end;
 
@@ -365,7 +379,7 @@ begin
     m_AsioDriver := nil;
   end;
 
-  m_CasEngine.NotifyOwner(ntDriverClosed);
+  NotifyOwner(ntDriverClosed);
 end;
 
 //==============================================================================
@@ -396,6 +410,12 @@ begin
 end;
 
 //==============================================================================
+function TCasAsio.GetPlaying : Boolean;
+begin
+  Result := m_bIsStarted;
+end;
+
+//==============================================================================
 function TCasAsio.GetReady : Boolean;
 begin
   Result := m_AsioDriver <> nil;
@@ -414,6 +434,13 @@ begin
     end;
   end;
 end;
+
+//==============================================================================
+function TCasAsio.GetBufferSize : Cardinal;
+begin
+  Result := m_nCurrentBufferSize;
+end;
+
 
 end.
 

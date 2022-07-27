@@ -31,22 +31,7 @@ const
   MINUTE_SEC = 60;
 
   c_nDefaultSampleRate = 44100;
-  c_nDirSndDefaultBufSize = 3000;
-
-type
-  TNotificationType = (ntBuffersCreated,
-                       ntBuffersDestroyed,
-                       ntBuffersUpdated,
-                       ntDriverClosed,
-                       ntRequestedReset);
-
-  TSecondSplit = (spMilliSeconds,
-                  spCentiSeconds,
-                  spDeciSeconds,
-                  spNone);
-
-  TIntArray = Array of Integer;
-  PIntArray = ^TIntArray;
+  c_nDefaultBufSize    = 3000;
 
 implementation
 
