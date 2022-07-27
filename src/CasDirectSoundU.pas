@@ -16,7 +16,7 @@ uses
 type
   TCasDirectSound = class(TInterfacedObject, IAudioDriver)
   private
-    m_CasEngine                  : TObject;
+    m_CasEngine : TObject;
 
     m_nBufferSize : Cardinal;
     m_nSampleSize : Cardinal;
@@ -69,7 +69,7 @@ destructor TCasDirectSound.Destroy;
 begin
   CloseDriver;
 
-  Inherited;
+  inherited;
 end;
 
 //==============================================================================

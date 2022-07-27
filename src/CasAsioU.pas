@@ -159,11 +159,9 @@ end;
 //==============================================================================
 destructor TCasAsio.Destroy;
 begin
-  if m_AsioDriver <> nil then
-    m_AsioDriver.Destroy;
+  CloseDriver;
 
   SetLength(m_DriverList, 0);
-
   DestroyWindow(m_hwndHandle);
 
   Inherited;
@@ -440,7 +438,6 @@ function TCasAsio.GetBufferSize : Cardinal;
 begin
   Result := m_nCurrentBufferSize;
 end;
-
 
 end.
 

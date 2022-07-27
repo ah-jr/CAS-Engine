@@ -12,10 +12,6 @@ uses
   CasMixerU,
   CasDatabaseU,
   CasPlaylistU,
-  CasDirectSoundU,
-  CasAsioU,
-  AsioList,
-  Asio,
   VCL.ExtCtrls;
 
 type
@@ -36,12 +32,12 @@ type
     m_bIsStarted                 : Boolean;
     m_bOwnerUpToDate             : Boolean;
 
-    m_CasAsio                    : TCasAsio;
-    m_CasDirSnd                  : TCasDirectSound;
+    m_AudioDriver                : IAudioDriver;
 
     procedure OnUpdateInfoTimer(Sender: TObject);
     procedure ProcessMessage(var MsgRec: TMessage);
     procedure InitializeVariables;
+    procedure FreeDriver;
 
   public
     constructor Create(a_Owner : TObject; a_Handle : HWND = 0);
@@ -76,9 +72,7 @@ type
     procedure CalculateBuffers(a_LeftOut : PIntArray; a_RightOut  : PIntArray);
 
 
-    property Asio        : TCasAsio         read m_CasAsio     write m_CasAsio;
-    property DirectSound : TCasDirectSound  read m_CasDirSnd   write m_CasDirSnd;
-
+    property Driver      : IAudioDriver     read m_AudioDriver write m_AudioDriver;
     property Level       : Double           read GetLevel      write SetLevel;
     property Position    : Integer          read GetPosition   write SetPosition;
 
@@ -109,6 +103,8 @@ uses
   System.Classes,
   System.SysUtils,
   CasBasicFxU,
+  CasDirectSoundU,
+  CasAsioU,
   CasUtilsU,
   Math;
 
@@ -132,11 +128,7 @@ begin
   m_tmrUpdateInfo.Enabled := False;
   m_tmrUpdateInfo.Free;
 
-  if m_CasAsio <> nil then
-    m_CasAsio.Free;
-
-  if (m_CasDirSnd <> nil) then
-    m_CasDirSnd.Free;
+  FreeDriver;
 
   Inherited;
 end;
@@ -161,8 +153,7 @@ begin
 
   m_CasDatabase.AddMixer(m_MainMixer);
 
-  m_CasAsio    := nil;
-  m_CasDirSnd  := nil;
+  m_AudioDriver := nil;
 
   m_bIsStarted                 := False;
   m_bBlockBufferPositionUpdate := False;
@@ -227,34 +218,29 @@ begin
 end;
 
 //==============================================================================
+procedure TCasEngine.FreeDriver;
+begin
+  if (m_AudioDriver <> nil) then
+    m_AudioDriver := nil;
+end;
+
+//==============================================================================
 procedure TCasEngine.ChangeDriver(a_dtDriverType : TDriverType; a_nID : Integer);
 begin
   //////////////////////////////////////////////////////////////////////////////
   ///  Close running drivers
-  if (m_CasDirSnd <> nil) then
-    m_CasDirSnd.CloseDriver;
-
-  if (m_CasAsio <> nil) then
-    m_CasAsio.CloseDriver;
+  FreeDriver;
 
   //////////////////////////////////////////////////////////////////////////////
-  ///  Open DirectSound driver
-  if a_dtDriverType = dtDirectSound then
+  ///  Open new driver
+  if m_AudioDriver = nil then
   begin
-    if m_CasDirSnd = nil then
-      m_CasDirSnd := TCasDirectSound.Create(Self);
+    case a_dtDriverType of
+      dtASIO        : m_AudioDriver := TCasAsio.Create(Self);
+      dtDirectSound : m_AudioDriver := TCasDirectSound.Create(Self);
+    end;
 
-    m_CasDirSnd.InitDriver(a_nID);
-  end;
-
-  //////////////////////////////////////////////////////////////////////////////
-  ///  Open ASIO driver
-  if a_dtDriverType = dtASIO then
-  begin
-    if m_CasAsio = nil then
-      m_CasAsio := TCasAsio.Create(Self);
-
-    m_CasAsio.InitDriver(a_nID);
+    m_AudioDriver.InitDriver(a_nID);
   end;
 end;
 
@@ -376,22 +362,22 @@ end;
 //==============================================================================
 procedure TCasEngine.Play;
 begin
-  if Asio <> nil then
-    Asio.Play;
+  if m_AudioDriver <> nil then
+    m_AudioDriver.Play;
 end;
 
 //==============================================================================
 procedure TCasEngine.Pause;
 begin
-  if Asio <> nil then
-    Asio.Pause;
+  if m_AudioDriver <> nil then
+    m_AudioDriver.Pause;
 end;
 
 //==============================================================================
 procedure TCasEngine.Stop;
 begin
-  if Asio <> nil then
-    Asio.Stop;
+  if m_AudioDriver <> nil then
+    m_AudioDriver.Stop;
 end;
 
 //==============================================================================
@@ -400,7 +386,7 @@ var
   nIndex : Integer;
   nPos   : Integer;
 begin
-  if Asio <> nil then
+  if m_AudioDriver <> nil then
   begin
     nPos := 0;
 
@@ -420,7 +406,7 @@ var
   nIndex : Integer;
   nPos   : Integer;
 begin
-  if Asio <> nil then
+  if m_AudioDriver <> nil then
   begin
     nPos := MaxInt;
 
@@ -470,7 +456,7 @@ end;
 //==============================================================================
 function TCasEngine.GetReady : Boolean;
 begin
-  Result := (Asio <> nil);
+  Result := (m_AudioDriver <> nil);
 end;
 
 //==============================================================================
@@ -478,8 +464,8 @@ function TCasEngine.GetSampleRate : Double;
 begin
   Result := c_nDefaultSampleRate;
 
-  if Asio <> nil then
-    Result := Asio.SampleRate;
+  if m_AudioDriver <> nil then
+    Result := m_AudioDriver.SampleRate;
 end;
 
 //==============================================================================
@@ -487,8 +473,8 @@ function TCasEngine.GetBufferSize : Cardinal;
 begin
   Result := c_nDefaultBufSize;
 
-  if Asio <> nil then
-    Result := Asio.BufferSize;
+  if m_AudioDriver <> nil then
+    Result := m_AudioDriver.BufferSize;
 end;
 
 //==============================================================================
