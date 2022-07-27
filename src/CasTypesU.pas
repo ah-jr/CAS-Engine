@@ -24,6 +24,8 @@ type
   TIntArray = Array of Integer;
   PIntArray = ^TIntArray;
 
+  TCallbackEvent = procedure(nOffset : Cardinal) of object;
+
   IAudioDriver = interface(IUnknown)
     procedure Play;
     procedure Pause;

@@ -21,7 +21,7 @@ type
 
     m_bBuffersCreated            : Boolean;
     m_bIsStarted                 : Boolean;
-    m_nCurrentBufferSize         : Integer;
+    m_nCurrentBufferSize         : Cardinal;
 
     m_RightBuffer                : TIntArray;
     m_LeftBuffer                 : TIntArray;
@@ -64,7 +64,7 @@ type
     property Playing    : Boolean   read m_bIsStarted;
     property Ready      : Boolean   read GetReady;
     property SampleRate : Double    read GetSampleRate;
-    property BufferSize : Integer   read m_nCurrentBufferSize;
+    property BufferSize : Cardinal  read m_nCurrentBufferSize;
 
   end;
 
