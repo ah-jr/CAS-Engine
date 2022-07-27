@@ -11,6 +11,7 @@ uses
   CasMixerU,
   CasDatabaseU,
   CasPlaylistU,
+  CasDirectSoundU,
   AsioList,
   Asio,
   VCL.ExtCtrls;
@@ -39,6 +40,7 @@ type
     m_RightBuffer                : TIntArray;
     m_LeftBuffer                 : TIntArray;
 
+    m_CasDirSnd                  : TCasDirectSound;
     m_AsioDriver                 : TOpenAsio;
     m_DriverList                 : TAsioDriverList;
     m_Callbacks                  : TASIOCallbacks;
@@ -243,6 +245,7 @@ begin
 
   m_AsioDriver := nil;
   m_BufferInfo := nil;
+  m_CasDirSnd  := nil;
 
   m_bFileLoaded                := False;
   m_bBuffersCreated            := False;
@@ -317,9 +320,24 @@ begin
   if m_AsioDriver <> nil then
     CloseDriver;
 
-  if a_nID >= 0 then
+  if (m_CasDirSnd <> nil) then
   begin
-    m_AsioDriver := TOpenAsio.Create(m_DriverList[a_nID].Id);
+    m_CasDirSnd.Terminate;
+    m_CasDirSnd.WaitFor;
+  end;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///  Open DirectSound driver
+  if a_nID = 0 then
+  begin
+    m_CasDirSnd := TCasDirectSound.Create;
+  end;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///  Open ASIO driver
+  if a_nID > 0 then
+  begin
+    m_AsioDriver := TOpenAsio.Create(m_DriverList[a_nID - 1].Id);
     if (m_AsioDriver <> nil) then
       if not Succeeded(m_AsioDriver.Init(Handle))
         then m_AsioDriver := nil
@@ -724,12 +742,13 @@ end;
 //==============================================================================
 function TCasEngine.GetSampleRate : Double;
 begin
+  Result := c_nDefaultSampleRate;
+
   if Ready then
   begin
     try
       m_AsioDriver.GetSampleRate(Result);
     except
-      Result := 0;
     end;
   end;
 end;

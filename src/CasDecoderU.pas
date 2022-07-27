@@ -63,6 +63,8 @@ begin
 
   m_lstCasTracks.Free;
 
+  Terminate;
+
   Inherited;
 end;
 
@@ -73,9 +75,9 @@ var
 begin
   NameThreadForDebugging('CasDecoder');
 
-  while True do
+  while (not Terminated) do
   begin
-    Sleep(10);
+    Sleep(10);  // Later: Set a event and use WaitFor
     if m_nAllowDecode then
     begin
       for strFileName in m_lstFiles do
@@ -157,10 +159,10 @@ begin
 
     // Two's complement:
     if (pData.Left[nSampleIdx]  >= Power(2, c_nBitDepth - 1)) then
-       pData.Left[nSampleIdx]  := pData.Left[nSampleIdx]  - Trunc(Power(2, c_nBitDepth));
+      pData.Left[nSampleIdx]  := pData.Left[nSampleIdx]  - Trunc(Power(2, c_nBitDepth));
 
     if (pData.Right[nSampleIdx] >= Power(2, c_nBitDepth - 1)) then
-       pData.Right[nSampleIdx] := pData.Right[nSampleIdx] - Trunc(Power(2, c_nBitDepth));
+      pData.Right[nSampleIdx] := pData.Right[nSampleIdx] - Trunc(Power(2, c_nBitDepth));
   end;
 
   Result := TCasTrack.Create;

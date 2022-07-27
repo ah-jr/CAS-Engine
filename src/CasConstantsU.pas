@@ -30,6 +30,9 @@ const
   HOUR_SEC   = 3600;
   MINUTE_SEC = 60;
 
+  c_nDefaultSampleRate = 44100;
+  c_nDirSndDefaultBufSize = 3000;
+
 type
   TNotificationType = (ntBuffersCreated,
                        ntBuffersDestroyed,
