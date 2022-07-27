@@ -32,7 +32,6 @@ type
     m_nIdCount                   : Integer;
     m_nCurrentBufferSize         : Integer;
     m_bBlockBufferPositionUpdate : Boolean;
-    m_bFileLoaded                : Boolean;
     m_bBuffersCreated            : Boolean;
     m_bIsStarted                 : Boolean;
     m_bOwnerUpToDate             : Boolean;
@@ -247,7 +246,6 @@ begin
   m_BufferInfo := nil;
   m_CasDirSnd  := nil;
 
-  m_bFileLoaded                := False;
   m_bBuffersCreated            := False;
   m_bIsStarted                 := False;
   m_bBlockBufferPositionUpdate := False;

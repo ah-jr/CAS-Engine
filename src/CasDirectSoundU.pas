@@ -14,8 +14,8 @@ uses
 type
   TCasDirectSound = class(TThread)
   private
-    m_nBufferSize : Integer;
-    m_nSampleSize : Integer;
+    m_nBufferSize : Cardinal;
+    m_nSampleSize : Cardinal;
 
     m_SoundBuffer : IDirectSoundBuffer;
     m_DirectSound : IDirectSound;
@@ -128,7 +128,7 @@ begin
     ///  playing, the other half gets filled with new samples
     m_SoundBuffer.GetCurrentPosition(@dwPlayPos, @dwWritePos);
 
-    if (dwPlayPos >= 0) and (dwPlayPos < m_nSampleSize) and (bHalved) then 
+    if (dwPlayPos < m_nSampleSize) and (bHalved) then
     begin
       PopulateBuffer(m_nSampleSize);
       bHalved := False;
@@ -138,7 +138,7 @@ begin
       PopulateBuffer(0);
       bHalved := True;
     end;
-    
+
     Sleep(1);   // Later: Set a event and use WaitFor
   end;
 end;
