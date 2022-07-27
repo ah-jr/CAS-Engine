@@ -167,6 +167,8 @@ begin
 
   Result := TCasTrack.Create;
   Result.RawData := pData;
+
+  SetLength(a_aobInputPCMData, 0);
 end;
 
 //==============================================================================

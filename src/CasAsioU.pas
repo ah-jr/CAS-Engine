@@ -27,6 +27,7 @@ type
     m_LeftBuffer                 : TIntArray;
 
     m_AsioDriver                 : TOpenAsio;
+    m_DriverList                 : TAsioDriverList;
     m_Callbacks                  : TASIOCallbacks;
     m_BufferInfo                 : PAsioBufferInfo;
     m_BufferTime                 : TAsioTime;
@@ -51,7 +52,7 @@ type
     procedure CloseDriver;
     procedure CreateBuffers;
     procedure DestroyBuffers;
-
+    procedure ChangeDriver(a_nID : Integer);
 
     property Driver     : TOpenAsio read m_AsioDriver write m_AsioDriver;
     property BufferTime : TAsioTime read m_BufferTime write m_BufferTime;
@@ -157,6 +158,8 @@ begin
   if m_AsioDriver <> nil then
     m_AsioDriver.Destroy;
 
+  SetLength(m_DriverList, 0);
+
   DestroyWindow(m_hwndHandle);
 
   Inherited;
@@ -175,8 +178,11 @@ begin
   m_AsioDriver := nil;
   m_BufferInfo := nil;
 
-  m_bBuffersCreated            := False;
-  m_bIsStarted                 := False;
+  m_bBuffersCreated := False;
+  m_bIsStarted      := False;
+
+  SetLength(m_DriverList, 0);
+  ListAsioDrivers(m_DriverList);
 end;
 
 //==============================================================================
@@ -261,6 +267,21 @@ begin
   end;
 
   m_AsioDriver.OutputReady;
+end;
+
+//==============================================================================
+procedure TCasAsio.ChangeDriver(a_nID : Integer);
+begin
+  if m_AsioDriver <> nil then
+    CloseDriver;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///  Open ASIO driver
+  m_AsioDriver := TOpenAsio.Create(m_DriverList[a_nID].Id);
+  if (m_AsioDriver <> nil) then
+    if not Succeeded(m_AsioDriver.Init(Handle))
+      then m_AsioDriver := nil
+      else CreateBuffers;
 end;
 
 //==============================================================================
