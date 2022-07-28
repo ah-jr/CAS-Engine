@@ -31,6 +31,7 @@ type
     procedure AddTrack   (a_nID: Integer);
     procedure RemoveTrack(a_nID: Integer);
     procedure ClearTracks;
+    procedure GoToTrack  (a_nID: Integer);
 
     property Progress    : Double   read GetProgress;
     property Position    : Integer  read GetPosition   write SetPosition;
@@ -84,7 +85,7 @@ begin
   nLength := GetLength;
 
   if nLength > 0 then
-    Result := m_dPosition / GetLength
+    Result := m_dPosition / nLength
   else
     Result := 0;
 end;
@@ -121,6 +122,19 @@ end;
 procedure TCasPlaylist.ClearTracks;
 begin
   m_lstTracks.Clear;
+end;
+
+//==============================================================================
+procedure TCasPlaylist.GoToTrack(a_nID: Integer);
+var
+  CasTrack : TCasTrack;
+begin
+  if m_lstTracks.IndexOf(a_nID) >= 0 then
+  begin
+    m_CasDatabase.GetTrackById(a_nID, CasTrack);
+  
+    Position := CasTrack.Position;
+  end;
 end;
 
 

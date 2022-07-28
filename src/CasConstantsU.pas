@@ -32,6 +32,7 @@ const
 
   c_nDefaultSampleRate = 44100;
   c_nDefaultBufSize    = 3000;
+  c_nUpdateInterval    = 10;
 
 implementation
 

@@ -20,20 +20,25 @@ type
   private
     m_hwndHandle                 : HWND;
     m_hwndOwner                  : HWND;
-    m_Owner                      : TObject;
-    m_MainMixer                  : TCasMixer;
-    m_tmrUpdateInfo              : TTimer;
-    m_dtDriverType               : TDriverType;
 
+    m_Owner                      : TObject;
+    m_dtDriverType               : TDriverType;
+    m_AudioDriver                : IAudioDriver;
     m_CasDatabase                : TCasDatabase;
     m_CasPlaylist                : TCasPlaylist;
+    m_MainMixer                  : TCasMixer;
+
+    m_tmrUpdateInfo              : TTimer;
+    m_bBufferSync                : Boolean;
+    m_nAsyncPos                  : Integer;
+    m_nUpdateCount               : Integer;
+    m_dtLastUpdate               : TDateTime;
+    m_bAsyncUpdate               : Boolean;
 
     m_nIdCount                   : Integer;
-    m_bBlockBufferPositionUpdate : Boolean;
-    m_bOwnerUpToDate             : Boolean;
 
-    m_AudioDriver                : IAudioDriver;
-
+    procedure StartUpdate;
+    procedure StopUpdate;
     procedure OnUpdateInfoTimer(Sender: TObject);
     procedure ProcessMessage(var MsgRec: TMessage);
     procedure InitializeVariables;
@@ -50,6 +55,7 @@ type
     procedure Stop;
     procedure Prev;
     procedure Next;
+    procedure GoToTrack(a_nID: Integer);
 
     function  GetLevel      : Double;
     function  GetPosition   : Integer;
@@ -84,6 +90,10 @@ type
     property MainMixer   : TCasMixer        read m_MainMixer    write m_MainMixer;
     property Handle      : HWND             read m_hwndHandle   write m_hwndHandle;
 
+    // Turn on AsyncUpdate if the size of the buffer is too large to update the
+    // application fast enough.
+    property AsyncUpdate : Boolean          read m_bAsyncUpdate write m_bAsyncUpdate;
+
     property Progress    : Double           read GetProgress;
     property Length      : Integer          read GetLength;
     property Time        : String           read GetTime;
@@ -109,6 +119,7 @@ uses
   CasDirectSoundU,
   CasAsioU,
   CasUtilsU,
+  DateUtils,
   Math;
 
 
@@ -128,6 +139,8 @@ begin
 
   m_tmrUpdateInfo.Enabled := False;
   m_tmrUpdateInfo.Free;
+  m_CasDatabase.Free;
+  m_CasPlaylist.Free;
 
   FreeDriver;
 
@@ -137,39 +150,88 @@ end;
 //==============================================================================
 procedure TCasEngine.InitializeVariables;
 begin
-  CasEngine    := Self;
-  m_hwndHandle := AllocateHWnd(ProcessMessage);
+  CasEngine                := Self;
+  m_hwndHandle             := AllocateHWnd(ProcessMessage);
 
-  m_tmrUpdateInfo := TTimer.Create(nil);
-  m_tmrUpdateInfo.Interval := 10;
-  m_tmrUpdateInfo.OnTimer := OnUpdateInfoTimer;
-  m_tmrUpdateInfo.Enabled := True;
+  m_tmrUpdateInfo          := TTimer.Create(nil);
+  m_tmrUpdateInfo.Interval := c_nUpdateInterval;
+  m_tmrUpdateInfo.OnTimer  := OnUpdateInfoTimer;
+  m_tmrUpdateInfo.Enabled  := True;
 
-  m_MainMixer       := TCasMixer.Create;
-  m_MainMixer.ID    := 0;
-  m_MainMixer.Level := 1;
+  m_MainMixer              := TCasMixer.Create;
+  m_MainMixer.ID           := GenerateId;
+  m_MainMixer.Level        := 1;
 
-  m_CasDatabase := TCasDatabase.Create;
+  m_CasDatabase            := TCasDatabase.Create;
   m_CasDatabase.AddMixer(m_MainMixer);
-  m_CasPlaylist := TCasPlaylist.Create(m_CasDatabase);
-  m_CasPlaylist.Position := 0;
+  m_CasPlaylist            := TCasPlaylist.Create(m_CasDatabase);
+  m_CasPlaylist.Position   := 0;
 
-  m_nIdCount      := 0;
-  m_AudioDriver  := nil;
-  m_dtDriverType := dtNone;
+  m_bAsyncUpdate           := False;
+  m_nAsyncPos              := 0;
+  m_nUpdateCount           := 0;
+  m_nIdCount               := 0;
+  m_AudioDriver            := nil;
+  m_dtDriverType           := dtNone;
+  m_bBufferSync            := False;
+  m_dtLastUpdate           := -1;
+end;
 
-  m_bBlockBufferPositionUpdate := False;
-  m_bOwnerUpToDate             := True;
+//==============================================================================
+procedure TCasEngine.StartUpdate;
+begin
+  m_dtLastUpdate := Now;
+  m_tmrUpdateInfo.Enabled := True;
+end;
+
+//==============================================================================
+procedure TCasEngine.StopUpdate;
+begin
+  m_tmrUpdateInfo.Enabled := False;
+  m_dtLastUpdate := -1;
+  m_bBufferSync  := False;
+  m_nUpdateCount := 0;
 end;
 
 //==============================================================================
 procedure TCasEngine.OnUpdateInfoTimer(Sender: TObject);
+var
+  dtDelta    : Double;
+  dPosOffset : Double;
+const
+  c_nThreshold = 100;
 begin
-  if not m_bOwnerUpToDate then
+  if m_bAsyncUpdate then
   begin
-    NotifyOwner(ntBuffersUpdated);
+    dtDelta := MilliSecondsBetween(Now, m_dtLastUpdate);
 
-    m_bOwnerUpToDate := True;
+    if dtDelta > c_nUpdateInterval then
+    begin
+      NotifyOwner(ntBuffersUpdated);
+
+      dPosOffset     := SampleRate * dtDelta * 0.001 * Playlist.Speed;
+      m_nAsyncPos    := Trunc(m_nAsyncPos + dPosOffset);
+      m_dtLastUpdate := Now;
+      Inc(m_nUpdateCount);
+
+      if m_nAsyncPos > m_CasPlaylist.Length then
+        m_nAsyncPos := m_nAsyncPos - m_CasPlaylist.Length;
+
+      // Sync with buffer once and a while
+      if m_nUpdateCount > c_nThreshold then
+      begin
+        m_nUpdateCount := 0;
+        m_nAsyncPos    := m_CasPlaylist.Position;
+      end;
+    end;
+  end
+  else
+  begin
+    if not m_bBufferSync then
+    begin
+      NotifyOwner(ntBuffersUpdated);
+      m_bBufferSync  := True;
+    end;
   end;
 end;
 
@@ -229,6 +291,7 @@ end;
 //==============================================================================
 procedure TCasEngine.ChangeDriver(a_dtDriverType : TDriverType; a_nID : Integer);
 begin
+  Pause;
   m_dtDriverType := a_dtDriverType;
 
   //////////////////////////////////////////////////////////////////////////////
@@ -382,7 +445,7 @@ begin
     while m_CasPlaylist.RelPos > m_CasPlaylist.Length do
       m_CasPlaylist.RelPos := m_CasPlaylist.RelPos - m_CasPlaylist.Length;
 
-    m_bOwnerUpToDate := False;
+    m_bBufferSync := False;
   end
 end;
 
@@ -391,6 +454,8 @@ procedure TCasEngine.Play;
 begin
   if m_AudioDriver <> nil then
     m_AudioDriver.Play;
+
+  StartUpdate;
 end;
 
 //==============================================================================
@@ -398,6 +463,8 @@ procedure TCasEngine.Pause;
 begin
   if m_AudioDriver <> nil then
     m_AudioDriver.Pause;
+
+  StopUpdate;
 end;
 
 //==============================================================================
@@ -406,6 +473,8 @@ begin
   if m_AudioDriver <> nil then
     m_AudioDriver.Stop;
 
+  StopUpdate;
+  m_nAsyncPos := 0;
   m_CasPlaylist.Position := 0;
 end;
 
@@ -415,18 +484,16 @@ var
   nIndex : Integer;
   nPos   : Integer;
 begin
-  if m_AudioDriver <> nil then
+  nPos := 0;
+
+  for nIndex := 0 to m_CasDatabase.Tracks.Count - 1 do
   begin
-    nPos := 0;
-
-    for nIndex := 0 to m_CasDatabase.Tracks.Count - 1 do
-    begin
-      if (m_CasDatabase.Tracks.Items[nIndex].Position < m_CasPlaylist.Position) then
-        nPos := Max(nPos, m_CasDatabase.Tracks.Items[nIndex].Position);
-    end;
-
-    m_CasPlaylist.Position := nPos;
+    if (m_CasDatabase.Tracks.Items[nIndex].Position < m_CasPlaylist.Position) then
+      nPos := Max(nPos, m_CasDatabase.Tracks.Items[nIndex].Position);
   end;
+
+  m_CasPlaylist.Position := nPos;
+  m_nAsyncPos := nPos;
 end;
 
 //==============================================================================
@@ -435,18 +502,23 @@ var
   nIndex : Integer;
   nPos   : Integer;
 begin
-  if m_AudioDriver <> nil then
+  nPos := MaxInt;
+
+  for nIndex := 0 to m_CasDatabase.Tracks.Count - 1 do
   begin
-    nPos := MaxInt;
-
-    for nIndex := 0 to m_CasDatabase.Tracks.Count - 1 do
-    begin
-      if (m_CasDatabase.Tracks.Items[nIndex].Position > m_CasPlaylist.Position) then
-        nPos := Min(nPos, m_CasDatabase.Tracks.Items[nIndex].Position);
-    end;
-
-    m_CasPlaylist.Position := nPos;
+    if (m_CasDatabase.Tracks.Items[nIndex].Position > m_CasPlaylist.Position) then
+      nPos := Min(nPos, m_CasDatabase.Tracks.Items[nIndex].Position);
   end;
+
+  m_CasPlaylist.Position := nPos;
+  m_nAsyncPos := nPos;
+end;
+
+//==============================================================================
+procedure TCasEngine.GoToTrack(a_nID: Integer);
+begin
+  m_CasPlaylist.GoToTrack(a_nID);
+  m_nAsyncPos := m_CasPlaylist.Position;
 end;
 
 //==============================================================================
@@ -477,13 +549,25 @@ end;
 //==============================================================================
 function TCasEngine.GetPosition : Integer;
 begin
-  Result := m_CasPlaylist.Position;
+  if m_bAsyncUpdate
+    then Result := m_nAsyncPos
+    else Result := m_CasPlaylist.Position;
 end;
 
 //==============================================================================
 function TCasEngine.GetProgress : Double;
+var
+  nLength : Integer;
 begin
-  Result := m_CasPlaylist.Progress;
+  if m_bAsyncUpdate then
+  begin
+    nLength := m_CasPlaylist.Length;
+
+    if nLength > 0
+      then Result := m_nAsyncPos / nLength
+      else Result := 0;
+  end
+    else Result := m_CasPlaylist.Progress;
 end;
 
 //==============================================================================
@@ -555,6 +639,7 @@ end;
 procedure TCasEngine.SetPosition(a_nPosition : Integer);
 begin
   m_CasPlaylist.Position := a_nPosition;
+  m_nAsyncPos := m_CasPlaylist.Position;
 end;
 
 //==============================================================================

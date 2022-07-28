@@ -70,10 +70,10 @@ begin
     ///  The buffer is divided in two. Each time a half of the buffer starts
     ///  playing, the other half gets filled with new samples
     if m_SoundBuffer <> nil then
-      begin
-        m_SoundBuffer.GetCurrentPosition(@dwPlayPos, @dwWritePos);
-        m_SoundBuffer.GetStatus(pdwStatus);
-      end;
+    begin
+      m_SoundBuffer.GetCurrentPosition(@dwPlayPos, @dwWritePos);
+      m_SoundBuffer.GetStatus(pdwStatus);
+    end;
 
     if Assigned(m_BufferCallback) and (pdwStatus and DSBSTATUS_PLAYING > 0) then
     begin
