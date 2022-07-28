@@ -19,7 +19,8 @@ type
                   spNone);
 
   TDriverType = (dtDirectSound,
-                 dtASIO);
+                 dtASIO,
+                 dtNone);
 
   TIntArray = Array of Integer;
   PIntArray = ^TIntArray;

@@ -53,6 +53,7 @@ type
     procedure Play;
     procedure Pause;
     procedure Stop;
+    procedure ControlPanel;
 
     procedure InitDriver(a_nID : Integer);
     procedure CloseDriver;
@@ -249,14 +250,9 @@ begin
           OutputInt32 := Info^.Buffers[a_nIndex];
           for nBufferIdx := 0 to m_nCurrentBufferSize-1 do
           begin
-            if nChannelIdx = 0 then
-            begin
-              OutputInt32^ := Trunc(Power(2, 32 - c_nBitDepth) * m_LeftBuffer[nBufferIdx]);
-            end
-            else
-            begin
-              OutputInt32^ := Trunc(Power(2, 32 - c_nBitDepth) * m_RightBuffer[nBufferIdx]);
-            end;
+            if nChannelIdx = 0
+              then OutputInt32^ := Trunc(Power(2, 32 - c_nBitDepth) * m_LeftBuffer [nBufferIdx])
+              else OutputInt32^ := Trunc(Power(2, 32 - c_nBitDepth) * m_RightBuffer[nBufferIdx]);
 
             Inc(OutputInt32);
           end;
@@ -405,6 +401,13 @@ procedure TCasAsio.Stop;
 begin
   if m_AsioDriver <> nil then
     Pause;
+end;
+
+//==============================================================================
+procedure TCasAsio.ControlPanel;
+begin
+  if (m_AsioDriver <> nil) then
+    m_AsioDriver.ControlPanel;
 end;
 
 //==============================================================================

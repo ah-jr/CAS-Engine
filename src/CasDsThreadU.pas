@@ -58,6 +58,7 @@ var
   dwPlayPos  : Cardinal;
   dwWritePos : Cardinal;
   bHalved    : Boolean;
+  pdwStatus  : DWORD;
 begin
   NameThreadForDebugging('CasDirectSound');
 
@@ -69,9 +70,12 @@ begin
     ///  The buffer is divided in two. Each time a half of the buffer starts
     ///  playing, the other half gets filled with new samples
     if m_SoundBuffer <> nil then
-      m_SoundBuffer.GetCurrentPosition(@dwPlayPos, @dwWritePos);
+      begin
+        m_SoundBuffer.GetCurrentPosition(@dwPlayPos, @dwWritePos);
+        m_SoundBuffer.GetStatus(pdwStatus);
+      end;
 
-    if Assigned(m_BufferCallback) then
+    if Assigned(m_BufferCallback) and (pdwStatus and DSBSTATUS_PLAYING > 0) then
     begin
       if (dwPlayPos < m_nSampleSize) and (bHalved) then
       begin

@@ -34,7 +34,7 @@ type
 
     procedure InitializeVariables;
     procedure BufferCallback(nOffset : Cardinal);
-    function  ConvertSample (a_nIndex : Integer) : Byte;
+    function  ConvertSample (a_nSmpIdx, a_nByteIdx : Integer) : Byte;
     procedure CreateBuffer;
 
   public
@@ -153,7 +153,9 @@ var
   ptrAudio2     : Pointer;
   dwBytesAudio1 : Cardinal;
   dwBytesAudio2 : Cardinal;
-  nBufferIdx    : Integer;
+  nSmpIdx       : Integer;
+  nByteIdx      : Integer;
+  nSamples      : Integer;
 begin
   if m_bIsStarted then
   begin
@@ -180,8 +182,13 @@ begin
 
     //////////////////////////////////////////////////////////////////////////////
     ///  Fill buffer
-    for nBufferIdx := 0 to dwBytesAudio1 - 1 do
-      TByteArray(ptrAudio1^)[nBufferIdx] := ConvertSample(nBufferIdx);
+    nSamples := dwBytesAudio1 div 6;
+
+    for nSmpIdx := 0 to nSamples - 1 do
+    begin
+      for nByteIdx := 0 to c_nBytesInSample - 1 do
+        TByteArray(ptrAudio1^)[nSmpIdx*c_nBytesInSample + nByteIdx] := ConvertSample(nSmpIdx, nByteIdx);
+    end;
 
     //////////////////////////////////////////////////////////////////////////////
     ///  Unlock for writing
@@ -193,9 +200,12 @@ begin
 end;
 
 //==============================================================================
-function TCasDirectSound.ConvertSample(a_nIndex : Integer) : Byte;
+function TCasDirectSound.ConvertSample(a_nSmpIdx, a_nByteIdx : Integer) : Byte;
 begin
-  Result := 0;
+  if a_nByteIdx < c_nBytesInChannel then
+    Result := m_LeftBuffer [a_nSmpIdx] shr (8 * (a_nByteIdx))
+  else
+    Result := m_RightBuffer[a_nSmpIdx] shr (8 * (a_nByteIdx - c_nBytesInChannel));
 end;
 
 //==============================================================================

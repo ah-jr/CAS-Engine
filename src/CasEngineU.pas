@@ -23,13 +23,13 @@ type
     m_Owner                      : TObject;
     m_MainMixer                  : TCasMixer;
     m_tmrUpdateInfo              : TTimer;
+    m_dtDriverType               : TDriverType;
 
     m_CasDatabase                : TCasDatabase;
     m_CasPlaylist                : TCasPlaylist;
 
     m_nIdCount                   : Integer;
     m_bBlockBufferPositionUpdate : Boolean;
-    m_bIsStarted                 : Boolean;
     m_bOwnerUpToDate             : Boolean;
 
     m_AudioDriver                : IAudioDriver;
@@ -56,12 +56,14 @@ type
     function  GetProgress   : Double;
     function  GetLength     : Integer;
     function  GetReady      : Boolean;
+    function  GetPlaying    : Boolean;
     function  GetSampleRate : Double;
     function  GetBufferSize : Cardinal;
     function  GetTime       : String;
     function  GetDuration   : String;
     function  GenerateID    : Integer;
 
+    procedure ControlPanel;
     procedure SetLevel     (a_dLevel : Double);
     procedure SetPosition  (a_nPosition : Integer);
     procedure ChangeDriver (a_dtDriverType : TDriverType; a_nID : Integer);
@@ -69,17 +71,18 @@ type
     function  AddTrackToPlaylist(a_nTrackId, a_nPosition : Integer) : Boolean;
     function  AddTrack(a_CasTrack : TCasTrack; a_nMixerId : Integer) : Boolean;
     procedure ClearTracks;
-    procedure CalculateBuffers(a_LeftOut : PIntArray; a_RightOut  : PIntArray);
+    procedure CalculateBuffers(a_LeftOut : PIntArray; a_RightOut : PIntArray);
 
 
-    property Driver      : IAudioDriver     read m_AudioDriver write m_AudioDriver;
-    property Level       : Double           read GetLevel      write SetLevel;
-    property Position    : Integer          read GetPosition   write SetPosition;
+    property Driver      : IAudioDriver     read m_AudioDriver  write m_AudioDriver;
+    property DriverType  : TDriverType      read m_dtDriverType write m_dtDriverType;
+    property Level       : Double           read GetLevel       write SetLevel;
+    property Position    : Integer          read GetPosition    write SetPosition;
 
-    property Playlist    : TCasPlaylist     read m_CasPlaylist write m_CasPlaylist;
-    property Database    : TCasDatabase     read m_CasDatabase write m_CasDatabase;
-    property MainMixer   : TCasMixer        read m_MainMixer   write m_MainMixer;
-    property Handle      : HWND             read m_hwndHandle  write m_hwndHandle;
+    property Playlist    : TCasPlaylist     read m_CasPlaylist  write m_CasPlaylist;
+    property Database    : TCasDatabase     read m_CasDatabase  write m_CasDatabase;
+    property MainMixer   : TCasMixer        read m_MainMixer    write m_MainMixer;
+    property Handle      : HWND             read m_hwndHandle   write m_hwndHandle;
 
     property Progress    : Double           read GetProgress;
     property Length      : Integer          read GetLength;
@@ -87,7 +90,7 @@ type
     property Duration    : String           read GetDuration;
 
     property Ready       : Boolean          read GetReady;
-    property Playing     : Boolean          read m_bIsStarted;
+    property Playing     : Boolean          read GetPlaying;
     property SampleRate  : Double           read GetSampleRate;
     property BufferSize  : Cardinal         read GetBufferSize;
 
@@ -114,8 +117,6 @@ constructor TCasEngine.Create(a_Owner : TObject; a_Handle : HWND = 0);
 begin
   m_Owner     := a_Owner;
   m_hwndOwner := a_Handle;
-  CasEngine   := Self;
-  m_nIdCount  := 0;
 
   InitializeVariables;
 end;
@@ -136,6 +137,7 @@ end;
 //==============================================================================
 procedure TCasEngine.InitializeVariables;
 begin
+  CasEngine    := Self;
   m_hwndHandle := AllocateHWnd(ProcessMessage);
 
   m_tmrUpdateInfo := TTimer.Create(nil);
@@ -143,19 +145,19 @@ begin
   m_tmrUpdateInfo.OnTimer := OnUpdateInfoTimer;
   m_tmrUpdateInfo.Enabled := True;
 
-  m_CasDatabase := TCasDatabase.Create;
-  m_CasPlaylist := TCasPlaylist.Create(m_CasDatabase);
-  m_CasPlaylist.Position := 0;
-
   m_MainMixer       := TCasMixer.Create;
   m_MainMixer.ID    := 0;
   m_MainMixer.Level := 1;
 
+  m_CasDatabase := TCasDatabase.Create;
   m_CasDatabase.AddMixer(m_MainMixer);
+  m_CasPlaylist := TCasPlaylist.Create(m_CasDatabase);
+  m_CasPlaylist.Position := 0;
 
-  m_AudioDriver := nil;
+  m_nIdCount      := 0;
+  m_AudioDriver  := nil;
+  m_dtDriverType := dtNone;
 
-  m_bIsStarted                 := False;
   m_bBlockBufferPositionUpdate := False;
   m_bOwnerUpToDate             := True;
 end;
@@ -227,6 +229,8 @@ end;
 //==============================================================================
 procedure TCasEngine.ChangeDriver(a_dtDriverType : TDriverType; a_nID : Integer);
 begin
+  m_dtDriverType := a_dtDriverType;
+
   //////////////////////////////////////////////////////////////////////////////
   ///  Close running drivers
   FreeDriver;
@@ -240,7 +244,8 @@ begin
       dtDirectSound : m_AudioDriver := TCasDirectSound.Create(Self);
     end;
 
-    m_AudioDriver.InitDriver(a_nID);
+    if m_AudioDriver <> nil then
+      m_AudioDriver.InitDriver(a_nID);
   end;
 end;
 
@@ -257,7 +262,7 @@ begin
 end;
 
 //==============================================================================
-procedure TCasEngine.CalculateBuffers(a_LeftOut : PIntArray; a_RightOut  : PIntArray);
+procedure TCasEngine.CalculateBuffers(a_LeftOut : PIntArray; a_RightOut : PIntArray);
 var
   nBufferIdx  : Integer;
   nPosition   : Integer;
@@ -265,6 +270,7 @@ var
   nTrackID    : Integer;
   nMixerIdx   : Integer;
   nBufInSize  : Integer;
+  nBufEndPos  : Integer;
   dGap        : Double;
   CasTrack    : TCasTrack;
   CasMixer    : TCasMixer;
@@ -272,13 +278,39 @@ var
   RightMaster : TIntArray;
   LeftTrack   : TIntArray;
   RightTrack  : TIntArray;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///  This procedure requires initialized data
+  procedure AddTrackToBuffer;
+  var
+    nBufferIdx : Integer;
+  begin
+    InterpolateRT(@(CasTrack.RawData.Left),
+                  @(CasTrack.RawData.Right),
+                  @LeftTrack,
+                  @RightTrack,
+                  CasTrack.Size,
+                  nBufInSize,
+                  1,
+                  nPosition);
+
+    for nBufferIdx := 0 to nBufInSize - 1 do
+    begin
+      LeftMaster [nBufferIdx] := LeftMaster[nBufferIdx]  +
+        Trunc(CasMixer.Level * LeftTrack [nBufferIdx]);
+
+      RightMaster[nBufferIdx] := RightMaster[nBufferIdx] +
+        Trunc(CasMixer.Level * RightTrack[nBufferIdx]);
+    end;
+  end;
+
 begin
-  if (m_CasPlaylist.Position < m_CasPlaylist.Length - BufferSize * m_CasPlaylist.Speed) then
+  if m_CasPlaylist.Speed > 0 then
   begin
     // The gap variable is used in order to prevent distortion when changing the
     // speed of playlist. It enables the interpolation algorithm to determine
     // which value goes first in the buffer.
-    dGap := (1-Frac(m_CasPlaylist.RelPos))/m_CasPlaylist.Speed;
+    dGap := (1 - Frac(m_CasPlaylist.RelPos)) / m_CasPlaylist.Speed;
 
     nBufInSize := Ceil((BufferSize - dGap) * m_CasPlaylist.Speed) + 2;
 
@@ -297,7 +329,7 @@ begin
       TIntArray(a_RightOut^)[nBufferIdx] := 0;
     end;
 
-    // For each mixer, get all linked tracks and add them to the buffer:
+    // For each mixer, get all linked tracks:
     for nMixerIdx := 0 to m_CasDatabase.Mixers.Count - 1 do
     begin
       CasMixer := m_CasDatabase.Mixers.Items[nMixerIdx];
@@ -306,33 +338,25 @@ begin
         nTrackID := CasMixer.Tracks.Items[nTrackIdx];
         if m_CasDatabase.GetTrackById(nTrackID, CasTrack) then
         begin
-          // If track's position is positive a is in the playlist:
+          // If the track's position is not -1, it's in the playlist:
           if (CasTrack.Position >= 0) then
           begin
+            // If track is within buffer range its data is added:
             nPosition := Trunc(m_CasPlaylist.RelPos) - CasTrack.Position;
+            if (nPosition + nBufInSize >= 0) then
+              AddTrackToBuffer;
 
-            // If playlist reached track's position, plays:
-            if (nPosition >= 0) and
-               (nPosition < CasTrack.Size - nBufInSize) then
-            begin
-              InterpolateRT(@(CasTrack.RawData.Left),
-                            @(CasTrack.RawData.Right),
-                            @LeftTrack,
-                            @RightTrack,
-                            CasTrack.Size,
-                            nBufInSize,
-                            1,
-                            nPosition);
+            // If playlist reached the end but the buffer still not full, the
+            // tracks at the beginning are added too:
+            nBufEndPos := m_CasPlaylist.Position + nBufInSize - m_CasPlaylist.Length;
+            nPosition  := Trunc(m_CasPlaylist.RelPos) - (CasTrack.Position + m_CasPlaylist.Length);
+            if (nBufEndPos >= 0) and (CasTrack.Position < nBufEndPos) then
+              AddTrackToBuffer;
 
-              for nBufferIdx := 0 to nBufInSize - 1 do
-              begin
-                LeftMaster [nBufferIdx] := LeftMaster[nBufferIdx]  +
-                  Trunc(CasMixer.Level * LeftTrack [nBufferIdx]);
-
-                RightMaster[nBufferIdx] := RightMaster[nBufferIdx] +
-                  Trunc(CasMixer.Level * RightTrack[nBufferIdx]);
-              end;
-            end;
+            // Note: theoretically there could be a buffer that is two or more
+            // times bigger than the track's length, in that case we should add
+            // the track more times in the same buffer. That could be a future
+            // improvement.
           end;
         end;
       end;
@@ -349,14 +373,17 @@ begin
                   0,
                   dGap);
 
+    // Update playlist's position:
     m_CasPlaylist.RelPos := m_CasPlaylist.RelPos + BufferSize * m_CasPlaylist.Speed;
-  end
-  else
-  begin
-    m_CasPlaylist.Position := 0;
-  end;
 
-  m_bOwnerUpToDate := False;
+    // If the position of the playlist's exceeded it's length, the tracks at the
+    // beginning already have been considered, so the position doesn't go back to
+    // zero. Instead it goes pass the start:
+    while m_CasPlaylist.RelPos > m_CasPlaylist.Length do
+      m_CasPlaylist.RelPos := m_CasPlaylist.RelPos - m_CasPlaylist.Length;
+
+    m_bOwnerUpToDate := False;
+  end
 end;
 
 //==============================================================================
@@ -378,6 +405,8 @@ procedure TCasEngine.Stop;
 begin
   if m_AudioDriver <> nil then
     m_AudioDriver.Stop;
+
+  m_CasPlaylist.Position := 0;
 end;
 
 //==============================================================================
@@ -421,6 +450,16 @@ begin
 end;
 
 //==============================================================================
+procedure TCasEngine.ControlPanel;
+begin
+  if (m_AudioDriver <> nil) then
+  begin
+    if m_AudioDriver is TCasAsio then
+      TCasAsio(m_AudioDriver).ControlPanel
+  end;
+end;
+
+//==============================================================================
 // Generate ID's for any CAS object
 //==============================================================================
 function TCasEngine.GenerateID : Integer;
@@ -458,6 +497,13 @@ function TCasEngine.GetReady : Boolean;
 begin
   Result := (m_AudioDriver <> nil);
 end;
+
+//==============================================================================
+function TCasEngine.GetPlaying : Boolean;
+begin
+  Result := (m_AudioDriver <> nil) and m_AudioDriver.Playing;
+end;
+
 
 //==============================================================================
 function TCasEngine.GetSampleRate : Double;

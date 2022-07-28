@@ -10,8 +10,9 @@ uses
   CasTypesU,
   CasConstantsU;
 
-  function BoolToInt(a_bBool : Boolean) : Integer;
+  function BoolToInt (a_bBool : Boolean) : Integer;
   function TimeString(a_nMiliSeconds : Int64 ; a_tmMeasure : TSecondSplit = spNone) : String;
+  function GE_L      (a_nTarget, a_nFirst, a_nSecond : Integer) : Boolean;
 
 implementation
 
@@ -64,6 +65,12 @@ begin
     spDeciSeconds  : Result := Result + ':' + IntToStr(Trunc(nRemaining / 100));
   end;
 
+end;
+
+//==============================================================================
+function GE_L(a_nTarget, a_nFirst, a_nSecond : Integer) : Boolean;
+begin
+  Result := (a_nTarget >= a_nFirst) and (a_nTarget < a_nSecond);
 end;
 
 end.
