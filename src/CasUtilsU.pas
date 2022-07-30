@@ -10,9 +10,9 @@ uses
   CasTypesU,
   CasConstantsU;
 
-  function BoolToInt (a_bBool : Boolean) : Integer;
-  function TimeString(a_nMiliSeconds : Int64 ; a_tmMeasure : TSecondSplit = spNone) : String;
-  function GE_L      (a_nTarget, a_nFirst, a_nSecond : Integer) : Boolean;
+function BoolToInt (a_bBool : Boolean) : Integer;
+function TimeString(a_nMiliSeconds : Int64 ; a_tmMeasure : TSecondSplit = spNone) : String;
+function GE_L      (a_nTarget, a_nFirst, a_nSecond : Integer) : Boolean;
 
 implementation
 
