@@ -2,6 +2,23 @@
 CAS-Engine's PATCH NOTES 
 ==============================================================================
 
+v1.6
+
+  - Created a DLL for the engine with a simple wrapper (CasDllWrapper.pas).
+    See examples/playAudio.cpp to learn how to use it.
+  - Added implementation for DirectSound.
+  - Remove need for auxiliary files while decoding by using pipe between the
+    ffmpeg process and the engine. 
+  - Added a method called AsyncUpdate to use in case the buffer is too large 
+    to properly update the application. It calculates the position using the
+    sample rate and eventually syncs with the buffers to prevent larger
+    inaccuracies.
+  - Created a Interface to make future driver implementations easier.
+  - Created AsyncDecodeFile, which uses a new thread to decode and prevents
+    the app from halting when loading files.
+  - Separated CasEngineU from actual driver implementations.
+  - New method for getting time/duration
+
 v1.5
 
   - Created clone procedure for TCasTrack.
