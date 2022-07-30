@@ -18,8 +18,8 @@ type
     m_lstFiles        : TStrings;
     m_dSampleRate     : Single;
     m_lstCasTracks    : TList<TCasTrack>;
-
-    procedure ExecuteAndWait (a_strCommand : String);
+    m_hdlStdOutRd     : THandle;
+    m_hdlStdOutWr     : THandle;
 
   protected
     procedure Execute; override;
@@ -28,6 +28,7 @@ type
     constructor Create;
     destructor Destroy; override;
 
+    function  RunCommand     (a_strCommand : string) : TBytes;
     function  CreateTrack    (a_aobInputPCMData : TBytes) : TCasTrack;
     function  DecodeFile     (a_strFileName : String; a_dSampleRate : Double) : TCasTrack;
     procedure AsyncDecodeFile(a_hwndCaller : HWND; a_lstFiles : TStrings; a_dSampleRate : Double);
@@ -46,6 +47,8 @@ uses
 constructor TCasDecoder.Create;
 begin
   m_nAllowDecode    := False;
+  m_hdlStdOutRd     := 0;
+  m_hdlStdOutWr     := 0;
   m_lstFiles        := nil;
   m_dSampleRate     := -1;
   m_lstCasTracks    := TList<TCasTrack>.Create;
@@ -106,9 +109,9 @@ end;
 function TCasDecoder.DecodeFile(a_strFileName : String; a_dSampleRate : Double)  : TCasTrack;
 var
   strCommand  : String;
+  aobFiledata : TBytes;
 const
   c_strFfmpegBin      = 'ffmpeg/ffmpeg.exe';
-  c_strOutPutFileName = 'output.raw';
 begin
   try
     strCommand := '-i "'                              +
@@ -116,13 +119,11 @@ begin
                   '" -f s24le -acodec pcm_s24le -ar ' +
                   a_dSampleRate.ToString              +
                   ' -ac 2 '                           +
-                  c_strOutPutFileName;
+                  'pipe:';
 
-    DeleteFile(c_strOutPutFileName);
-    ExecuteAndWait(c_strFfmpegBin + ' ' + strCommand);
-    Result          := CreateTrack(TFile.ReadAllBytes(c_strOutPutFileName));
+    aobFiledata     := RunCommand(c_strFfmpegBin + ' ' + strCommand);
+    Result          := CreateTrack(aobFiledata);
     Result.Title    := TPath.GetFileNameWithoutExtension(a_strFileName);
-    DeleteFile(c_strOutPutFileName);
   except
     Result := nil;
   end;
@@ -172,29 +173,58 @@ begin
 end;
 
 //==============================================================================
-procedure TCasDecoder.ExecuteAndWait(a_strCommand : string);
+function TCasDecoder.RunCommand(a_strCommand : string) : TBytes;
+const
+  c_nBufSize = 4096;
 var
-  tmpStartupInfo        : TStartupInfo;
-  tmpProcessInformation : TProcessInformation;
-  tmpProgram            : String;
+  tmpStartupInfo : TStartupInfo;
+  tmpProcessInfo : TProcessInformation;
+  chBuf          : array[0..c_nBufSize] of Byte;
+  saAttr         : SECURITY_ATTRIBUTES;
+  bReading       : Boolean;
+  nBufIdx        : Integer;
+  nDataIdx       : Integer;
+  dwRead         : DWORD;
+  tmpProgram     : String;
 begin
+  saAttr.nLength              := sizeof(SECURITY_ATTRIBUTES);
+  saAttr.bInheritHandle       := TRUE;
+  saAttr.lpSecurityDescriptor := nil;
+
+  CreatePipe(m_hdlStdOutRd, m_hdlStdOutWr, @saAttr, 0);
+  SetHandleInformation(m_hdlStdOutRd, HANDLE_FLAG_INHERIT, 0);
+
   tmpProgram := Trim(a_strCommand);
   FillChar(tmpStartupInfo, SizeOf(tmpStartupInfo), 0);
-  with tmpStartupInfo do
-  begin
-    cb          := SizeOf(TStartupInfo);
-    wShowWindow := SW_HIDE;
-  end;
+
+  tmpStartupInfo.cb          := SizeOf(TStartupInfo);
+  tmpStartupInfo.wShowWindow := SW_HIDE;
+  tmpStartupInfo.hStdOutput  := m_hdlStdOutWr;
+  tmpStartupInfo.dwFlags     := tmpStartupInfo.dwFlags or STARTF_USESTDHANDLES;
 
   if CreateProcess(nil, PChar(tmpProgram), nil, nil, True, CREATE_NO_WINDOW,
-    nil, nil, tmpStartupInfo, tmpProcessInformation) then
+    nil, nil, tmpStartupInfo, tmpProcessInfo) then
   begin
-    while WaitForSingleObject(tmpProcessInformation.hProcess, 10) > 0 do
+    CloseHandle(tmpProcessInfo.hProcess);
+    CloseHandle(tmpProcessInfo.hThread);
+    CloseHandle(m_hdlStdOutWr);
+
+    bReading := True;
+    dwRead   := 0;
+    nDataIdx := 0;
+
+    // Read from process's pipe
+    while (bReading) do
     begin
-      //Application.ProcessMessages;
+      bReading := ReadFile(m_hdlStdOutRd, chBuf, c_nBufSize, &dwRead, nil);
+      SetLength(Result, nDataIdx + Integer(dwRead));
+
+      for nBufIdx := 0 to dwRead - 1 do
+      begin
+        Result[nDataIdx] := chBuf[nBufIdx];
+        Inc(nDataIdx);
+      end;
     end;
-    CloseHandle(tmpProcessInformation.hProcess);
-    CloseHandle(tmpProcessInformation.hThread);
   end
   else
   begin
