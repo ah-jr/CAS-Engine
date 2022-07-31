@@ -62,14 +62,13 @@ end;
 //==============================================================================
 destructor  TCasDatabase.Destroy;
 var
-  CasTrack : TCasTrack;
-  CasMixer : TCasMixer;
+  nIndex : Integer;
 begin
-  for CasTrack in m_lstTracks do
-    CasTrack.Free;
+  for nIndex := 0 to m_lstTracks.Count - 1 do
+    m_lstTracks.Items[nIndex].Free;
 
-  for CasMixer in m_lstMixers do
-    CasMixer.Free;
+  for nIndex := 0 to m_lstMixers.Count - 1 do
+    m_lstMixers.Items[nIndex].Free;
 
   m_lstTracks.Free;
   m_lstMixers.Free;

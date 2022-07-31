@@ -69,6 +69,9 @@ type
     function  GetDuration   : String;
     function  GenerateID    : Integer;
 
+    function  GetActiveTracks : TList<Integer>;
+    function  GetTrackProgress(a_nTrackId : Integer) : Double;
+
     procedure ControlPanel;
     procedure SetLevel     (a_dLevel : Double);
     procedure SetPosition  (a_nPosition : Integer);
@@ -76,6 +79,7 @@ type
 
     function  AddTrackToPlaylist(a_nTrackId, a_nPosition : Integer) : Boolean;
     function  AddTrack(a_CasTrack : TCasTrack; a_nMixerId : Integer) : Boolean;
+    procedure DeleteTrack(a_nTrackId : Integer);
     procedure ClearTracks;
     procedure CalculateBuffers(a_LeftOut : PIntArray; a_RightOut : PIntArray);
 
@@ -103,6 +107,9 @@ type
     property Playing     : Boolean          read GetPlaying;
     property SampleRate  : Double           read GetSampleRate;
     property BufferSize  : Cardinal         read GetBufferSize;
+
+    property ActiveTracks : TList<Integer> read GetActiveTracks;
+
 
   end;
 
@@ -256,6 +263,13 @@ begin
     CasTrack.Position := a_nPosition;
     m_CasPlaylist.AddTrack(a_nTrackId);
   end;
+end;
+
+//==============================================================================
+procedure TCasEngine.DeleteTrack(a_nTrackId : Integer);
+begin
+  m_CasPlaylist.RemoveTrack(a_nTrackId);
+  m_CasDatabase.RemoveTrack(a_nTrackId);
 end;
 
 //==============================================================================
@@ -627,6 +641,18 @@ begin
 
   if dSampleRate > 0 then
     Result := TimeString(Trunc(1000 * (m_CasPlaylist.Length / dSampleRate)));
+end;
+
+//==============================================================================
+function TCasEngine.GetActiveTracks : TList<Integer>;
+begin
+  Result := m_CasPlaylist.ActiveTracks;
+end;
+
+//==============================================================================
+function TCasEngine.GetTrackProgress(a_nTrackId : Integer) : Double;
+begin
+  Result := m_CasPlaylist.GetTrackProgress(a_nTrackId);
 end;
 
 //==============================================================================

@@ -29,6 +29,7 @@ type
     constructor Create;
     destructor  Destroy; override;
     function  Clone   : TCasTrack;
+    function  IsPlaying(a_dPosition : Double) : Boolean;
 
     property ID          : Integer  read m_nID         write m_nID;
     property Title       : String   read m_strTitle    write m_strTitle;
@@ -85,6 +86,12 @@ begin
   Move(m_RawData.Right[0], pData.Right[0], GetSize * SizeOf(Integer));
 
   Result.RawData := pData;
+end;
+
+//==============================================================================
+function TCasTrack.IsPlaying(a_dPosition : Double) : Boolean;
+begin
+  Result := (m_nPosition < a_dPosition) and (m_nPosition + Size > a_dPosition);
 end;
 
 ////==============================================================================
