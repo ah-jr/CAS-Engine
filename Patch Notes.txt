@@ -2,6 +2,11 @@
 CAS-Engine's PATCH NOTES 
 ==============================================================================
 
+v1.7
+
+  - Made GetTrackProgress async compatible
+  - Added methods to get info for active tracks
+
 v1.6
 
   - Created a DLL for the engine with a simple wrapper (CasDllWrapper.pas).
