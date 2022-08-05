@@ -35,7 +35,6 @@ type
     procedure GoToTrack  (a_nID: Integer);
 
     function GetActiveTracks : TList<Integer>;
-    function GetTrackProgress(a_nTrackId : Integer) : Double;
 
     property Progress    : Double   read GetProgress;
     property Position    : Integer  read GetPosition   write SetPosition;
@@ -132,23 +131,6 @@ begin
   end;
 
   Result := m_lstActTrks;
-end;
-
-//==============================================================================
-function TCasPlaylist.GetTrackProgress(a_nTrackId : Integer) : Double;
-var
-  CasTrack  : TCasTrack;
-  nPosition : Integer;
-begin
-  Result := -1;
-
-  if m_CasDatabase.GetTrackById(a_nTrackId, CasTrack) then
-  begin
-    nPosition := Trunc(m_dPosition - CasTrack.Position);
-  
-    if CasTrack.IsPlaying(m_dPosition) then
-      Result := nPosition/CasTrack.Size;
-  end;
 end;
 
 //==============================================================================

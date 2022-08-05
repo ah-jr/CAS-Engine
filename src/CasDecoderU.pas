@@ -81,7 +81,7 @@ begin
   while (not Terminated) do
   begin
     Sleep(10);  // Later: Set a event and use WaitFor
-    if m_nAllowDecode then
+    if m_nAllowDecode and (m_lstFiles <> nil) then
     begin
       for strFileName in m_lstFiles do
         m_lstCasTracks.Add(DecodeFile(strFileName, m_dSampleRate));

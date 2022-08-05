@@ -651,8 +651,19 @@ end;
 
 //==============================================================================
 function TCasEngine.GetTrackProgress(a_nTrackId : Integer) : Double;
+var
+  CasTrack  : TCasTrack;
+  nPosition : Integer;
 begin
-  Result := m_CasPlaylist.GetTrackProgress(a_nTrackId);
+  Result := -1;
+
+  if m_CasDatabase.GetTrackById(a_nTrackId, CasTrack) then
+  begin
+    nPosition := Trunc(Position - CasTrack.Position);
+
+    if CasTrack.IsPlaying(Position) then
+      Result := nPosition/CasTrack.Size;
+  end;
 end;
 
 //==============================================================================
