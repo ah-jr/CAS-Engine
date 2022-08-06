@@ -27,11 +27,14 @@ exports
   ce_loadDirectSound,
   ce_loadFileIntoTrack,
   ce_addTrackToPlaylist,
+  ce_setCallback,
 
   ce_play,
   ce_pause,
   ce_stop,
-  ce_changeSpeed,
+  ce_setSpeed,
+  ce_setLevel,
+  ce_getProgress,
 
   ce_isPlaying;
 

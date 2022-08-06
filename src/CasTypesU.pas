@@ -25,7 +25,8 @@ type
   TIntArray = Array of Integer;
   PIntArray = ^TIntArray;
 
-  TCallbackEvent = procedure(nOffset : Cardinal) of object;
+  TCallbackEvent  = procedure(nOffset : Cardinal) of object;
+  TCallbackExtern = function : Integer of object; stdcall;
 
   IAudioDriver = interface(IUnknown)
     procedure Play;

@@ -34,6 +34,7 @@ type
     m_nUpdateCount               : Integer;
     m_dtLastUpdate               : TDateTime;
     m_bAsyncUpdate               : Boolean;
+    m_ptrCallback                : TCallbackExtern;
 
     m_nIdCount                   : Integer;
 
@@ -93,6 +94,7 @@ type
     property Database    : TCasDatabase     read m_CasDatabase  write m_CasDatabase;
     property MainMixer   : TCasMixer        read m_MainMixer    write m_MainMixer;
     property Handle      : HWND             read m_hwndHandle   write m_hwndHandle;
+    property CallbackExt : TCallbackExtern  read m_ptrCallback  write m_ptrCallback;
 
     // Turn on AsyncUpdate if the size of the buffer is too large to update the
     // application fast enough.
@@ -179,6 +181,7 @@ begin
   m_nUpdateCount           := 0;
   m_nIdCount               := 0;
   m_AudioDriver            := nil;
+  m_ptrCallback            := nil;
   m_dtDriverType           := dtNone;
   m_bBufferSync            := False;
   m_dtLastUpdate           := -1;
@@ -460,7 +463,11 @@ begin
       m_CasPlaylist.RelPos := m_CasPlaylist.RelPos - m_CasPlaylist.Length;
 
     m_bBufferSync := False;
-  end
+  end;
+
+  // Call extern functions (USE WISELY!)
+  if Assigned(m_ptrCallback) then
+    m_ptrCallback;
 end;
 
 //==============================================================================

@@ -6,6 +6,7 @@ uses
   Winapi.Windows,
   Winapi.Messages,
   Math,
+  SysUtils,
   CasEngineU,
   CasTrackU,
   CasTypesU,
@@ -23,11 +24,14 @@ function ce_free : Integer; stdcall;
 function ce_loadDirectSound : Integer; stdcall;
 function ce_loadFileIntoTrack (filename : PAnsiChar) : Integer; stdcall;
 function ce_addTrackToPlaylist(trackID : Integer) : Integer; stdcall;
+function ce_setCallback(callback : TCallbackExtern) : Integer; stdcall;
 
 function ce_play : Integer; stdcall;
 function ce_pause : Integer; stdcall;
 function ce_stop : Integer; stdcall;
-function ce_changeSpeed(speed : Double) : Integer; stdcall;
+function ce_setSpeed(speed : Double) : Integer; stdcall;
+function ce_setLevel(level : Double) : Integer; stdcall;
+function ce_getProgress : Double; stdcall;
 
 function ce_isPlaying : Boolean; stdcall;
 
@@ -69,14 +73,18 @@ function ce_loadFileIntoTrack(filename : PAnsiChar) : Integer;
 var
   Track : TCasTrack;
 begin
-  try
-    Track    := g_Decoder.DecodeFile(String(filename), g_nSampleRate);
-    Track.ID := g_Engine.GenerateID;
-    g_Engine.AddTrack(Track, 0);
+  Result := -1;
 
-    Result := Track.ID;
+  try
+    if FileExists(String(filename)) then
+    begin
+      Track    := g_Decoder.DecodeFile(String(filename), g_nSampleRate);
+      Track.ID := g_Engine.GenerateID;
+      g_Engine.AddTrack(Track, 0);
+
+      Result := Track.ID;
+    end;
   except
-    Result := -1;
   end;
 end;
 
@@ -86,6 +94,17 @@ begin
 
   try
     g_Engine.AddTrackToPlaylist(trackID, 0);
+  except
+    Result := -1;
+  end;
+end;
+
+function ce_setCallback(callback : TCallbackExtern) : Integer;
+begin
+  Result := 1;
+
+  try
+    g_Engine.CallbackExt := callback;
   except
     Result := -1;
   end;
@@ -135,12 +154,32 @@ begin
   end;
 end;
 
-function ce_changeSpeed(speed : Double) : Integer;
+function ce_setSpeed(speed : Double) : Integer;
 begin
   Result := 1;
 
   try
     g_Engine.Playlist.Speed := speed;
+  except
+    Result := -1;
+  end;
+end;
+
+function ce_setLevel(level : Double) : Integer;
+begin
+  Result := 1;
+
+  try
+    g_Engine.Level := level;
+  except
+    Result := -1;
+  end;
+end;
+
+function ce_getProgress : Double;
+begin
+  try
+    Result := g_Engine.Progress;
   except
     Result := -1;
   end;
