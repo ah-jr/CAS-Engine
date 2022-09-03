@@ -54,17 +54,19 @@ begin
   m_strTitle  := '';
   m_nPosition := -1;
   m_dLevel    := 1;
-  RawData     := nil;
+  m_RawData   := nil;
 end;
 
 //==============================================================================
 destructor TCasTrack.Destroy;
 begin
-  if RawData <> nil then
+  if m_RawData <> nil then
   begin
     SetLength(m_RawData.Left,  0);
     SetLength(m_RawData.Right, 0);
   end;
+
+  Dispose(m_RawData);
 end;
 
 //==============================================================================

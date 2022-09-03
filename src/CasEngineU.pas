@@ -21,7 +21,6 @@ type
     m_hwndHandle                 : HWND;
     m_hwndOwner                  : HWND;
 
-    m_Owner                      : TObject;
     m_dtDriverType               : TDriverType;
     m_AudioDriver                : IAudioDriver;
     m_CasDatabase                : TCasDatabase;
@@ -46,7 +45,7 @@ type
     procedure FreeDriver;
 
   public
-    constructor Create(a_Owner : TObject; a_Handle : HWND = 0);
+    constructor Create(a_hwndOwner : HWND = 0);
     destructor  Destroy; override;
 
     procedure NotifyOwner(a_ntNotification : TNotificationType);
@@ -70,6 +69,7 @@ type
     function  GetDuration   : String;
     function  GenerateID    : Integer;
 
+    function  GetTrackCount : Integer;
     function  GetActiveTracks : TList<Integer>;
     function  GetTrackProgress(a_nTrackId : Integer) : Double;
 
@@ -133,10 +133,9 @@ uses
 
 
 //==============================================================================
-constructor TCasEngine.Create(a_Owner : TObject; a_Handle : HWND = 0);
+constructor TCasEngine.Create(a_hwndOwner : HWND = 0);
 begin
-  m_Owner     := a_Owner;
-  m_hwndOwner := a_Handle;
+  m_hwndOwner := a_hwndOwner;
 
   InitializeVariables;
 end;
@@ -648,6 +647,12 @@ begin
 
   if dSampleRate > 0 then
     Result := TimeString(Trunc(1000 * (m_CasPlaylist.Length / dSampleRate)));
+end;
+
+//==============================================================================
+function TCasEngine.GetTrackCount : Integer;
+begin
+  Result := m_CasDatabase.Tracks.Count;
 end;
 
 //==============================================================================

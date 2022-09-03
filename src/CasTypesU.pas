@@ -22,6 +22,15 @@ type
                  dtASIO,
                  dtNone);
 
+  TAudioFormat = (afMp3,
+                  afWav);
+
+  TAudioSpecs = record
+    BitDepth   : Integer;
+    SampleRate : Integer;
+    Format     : TAudioFormat;
+  end;
+
   TIntArray = Array of Integer;
   PIntArray = ^TIntArray;
 
