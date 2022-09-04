@@ -14,8 +14,8 @@ uses
 function BoolToInt (a_bBool : Boolean) : Integer;
 function TimeString(a_nMiliSeconds : Int64 ; a_tmMeasure : TSecondSplit = spNone) : String;
 function GE_L      (a_nTarget, a_nFirst, a_nSecond : Integer) : Boolean;
-
 function RunCommand(a_strCommand : string; a_bStdIn : TBytes) : TBytes;
+function IntBufferToPcm24(bufLeft, bufRight : PIntArray; a_nSmpIdx, a_nByteIdx : Integer) : Byte;
 
 implementation
 
@@ -80,22 +80,33 @@ const
 var
   hdlStdOutRd    : THandle;
   hdlStdOutWr    : THandle;
+  hdlStdInRd     : THandle;
+  hdlStdInWr     : THandle;
   tmpStartupInfo : TStartupInfo;
   tmpProcessInfo : TProcessInformation;
-  chBuf          : array[0..c_nBufSize] of Byte;
+  chBufOut       : array[0..c_nBufSize] of Byte;
+  chBufIn        : array[0..c_nBufSize] of Byte;
   saAttr         : SECURITY_ATTRIBUTES;
   bReading       : Boolean;
+  bWriting       : Boolean;
   nBufIdx        : Integer;
   nDataIdx       : Integer;
+  nWrLength      : Integer;
   dwRead         : DWORD;
+  dwWritten      : DWORD;
   tmpProgram     : String;
 begin
   saAttr.nLength              := sizeof(SECURITY_ATTRIBUTES);
   saAttr.bInheritHandle       := TRUE;
   saAttr.lpSecurityDescriptor := nil;
 
+  // Create stdout :
   CreatePipe(hdlStdOutRd, hdlStdOutWr, @saAttr, 0);
   SetHandleInformation(hdlStdOutRd, HANDLE_FLAG_INHERIT, 0);
+
+  // Create stdin :
+  CreatePipe(hdlStdInRd, hdlStdInWr, @saAttr, 0);
+  SetHandleInformation(hdlStdInWr, HANDLE_FLAG_INHERIT, 0);
 
   tmpProgram := Trim(a_strCommand);
   FillChar(tmpStartupInfo, SizeOf(tmpStartupInfo), 0);
@@ -103,6 +114,7 @@ begin
   tmpStartupInfo.cb          := SizeOf(TStartupInfo);
   tmpStartupInfo.wShowWindow := SW_HIDE;
   tmpStartupInfo.hStdOutput  := hdlStdOutWr;
+  tmpStartupInfo.hStdInput   := hdlStdInRd;
   tmpStartupInfo.dwFlags     := tmpStartupInfo.dwFlags or STARTF_USESTDHANDLES;
 
   if CreateProcess(nil, PChar(tmpProgram), nil, nil, True, CREATE_NO_WINDOW,
@@ -111,28 +123,57 @@ begin
     CloseHandle(tmpProcessInfo.hProcess);
     CloseHandle(tmpProcessInfo.hThread);
     CloseHandle(hdlStdOutWr);
+    CloseHandle(hdlStdInRd);
 
+    // Read from stdout
     bReading := True;
     dwRead   := 0;
     nDataIdx := 0;
 
-    // Read from process's pipe
     while (bReading) do
     begin
-      bReading := ReadFile(hdlStdOutRd, chBuf, c_nBufSize, &dwRead, nil);
+      bReading := ReadFile(hdlStdOutRd, chBufOut, c_nBufSize, &dwRead, nil);
       SetLength(Result, nDataIdx + Integer(dwRead));
 
       for nBufIdx := 0 to dwRead - 1 do
       begin
-        Result[nDataIdx] := chBuf[nBufIdx];
+        Result[nDataIdx] := chBufOut[nBufIdx];
         Inc(nDataIdx);
       end;
+    end;
+
+    // Write to stdin
+    bWriting  := Length(a_bStdIn) > 0;
+    dwWritten := 0;
+    nDataIdx  := 0;
+
+    while (bWriting) do
+    begin
+      for nBufIdx := 0 to c_nBufSize - 1 do
+      begin
+        nWrLength := nBufIdx;
+        if nDataIdx >= Length(a_bStdIn) then Break;
+
+        chBufIn[nBufIdx] := a_bStdIn[nDataIdx];
+        Inc(nDataIdx);
+      end;
+
+      bWriting := WriteFile(hdlStdInWr, chBufIn, nWrLength, &dwWritten, nil);
     end;
   end
   else
   begin
     RaiseLastOSError;
   end;
+end;
+
+//==============================================================================
+function IntBufferToPcm24(bufLeft, bufRight : PIntArray; a_nSmpIdx, a_nByteIdx : Integer) : Byte;
+begin
+  if a_nByteIdx < c_nBytesInChannel then
+    Result := TIntArray(bufLeft^) [a_nSmpIdx] shr (8 * (a_nByteIdx))
+  else
+    Result := TIntArray(bufRight^)[a_nSmpIdx] shr (8 * (a_nByteIdx - c_nBytesInChannel));
 end;
 
 end.

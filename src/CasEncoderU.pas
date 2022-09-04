@@ -53,80 +53,52 @@ var
 const
   c_strFfmpegBin      = 'ffmpeg/ffmpeg.exe';
 begin
-// Result := True;
+  Result := True;
 
-// try
+  try
+    aobFiledata := RenderToPcm(a_CasEngine);
+    strCommand := '-f s24le -acodec pcm_s24le -ar ' +
+                  a_asOut.SampleRate.ToString       +
+                  ' -ac 2 -i pipe: "'               +
+                  a_strFileName + '"';
 
-// aobFiledata := PlaylistToPcm(a_CasEngine);
-// strCommand := ...
-// RunCommand(strCommand, aobFiledata);
-
-// except
-// Result := False;
-
-
-
-//  try
-//    strCommand := '-i "'                              +
-//                  a_strFileName                       +
-//                  '" -f s24le -acodec pcm_s24le -ar ' +
-//                  a_dSampleRate.ToString              +
-//                  ' -ac 2 '                           +
-//                  'pipe:';
-//
-//    aobFiledata     := RunCommand(c_strFfmpegBin + ' ' + strCommand);
-//    Result          := CreateTrack(aobFiledata);
-//    Result.Title    := TPath.GetFileNameWithoutExtension(a_strFileName);
-//  except
-//    Result := nil;
-//  end;
+    RunCommand(c_strFfmpegBin + ' ' + strCommand, aobFiledata);
+  except
+    Result := False;
+  end;
 end;
 
 //==============================================================================
 function TCasEncoder.RenderToPcm(a_CasEngine : TCasEngine) : TBytes;
 var
-  nSampleIdx         : Integer;
-  nByteIdx           : Integer;
-  nRightChannelBytes : Integer;
-  nLeftChannelBytes  : Integer;
-  nSize              : Integer;
-  pData              : PRawData;
+  bufLeft       : TIntArray;
+  bufRight      : TIntArray;
+  nLastPosition : Integer;
+  nSmpIdx       : Integer;
+  nByteIdx      : Integer;
+  bResult       : Byte;
 begin
-// for ... a_CasEngine.CalculateBuffers(left, right)
-// Result.Append(left, right)
+  SetLength(Result, 0);
+  a_CasEngine.SetPosition(0);
+  nLastPosition := 0;
 
+  while a_CasEngine.GetPosition > nLastPosition do
+  begin
+    nLastPosition := a_CasEngine.GetPosition;
 
-//  New(pData);
-//
-//  nSize := Length(a_aobInputPCMData) div c_nBytesInSample;
-//
-//  SetLength(pData.Left,  nSize);
-//  SetLength(pData.Right, nSize);
-//
-//
-//  for nSampleIdx := 0 to nSize - 1 do
-//  begin
-//    for nByteIdx := 0 to c_nBytesInChannel - 1  do
-//    begin
-//      nLeftChannelBytes  := a_aobInputPCMData[c_nBytesInSample * nSampleIdx + nByteIdx];
-//      nRightChannelBytes := a_aobInputPCMData[c_nBytesInSample * nSampleIdx + nByteIdx + c_nBytesInChannel];
-//
-//      pData.Left[nSampleIdx]  := pData.Left[nSampleIdx]  + nLeftChannelBytes  * Trunc(Power(2, c_nByteSize * nByteIdx));
-//      pData.Right[nSampleIdx] := pData.Right[nSampleIdx] + nRightChannelBytes * Trunc(Power(2, c_nByteSize * nByteIdx));
-//    end;
-//
-//    // Two's complement:
-//    if (pData.Left[nSampleIdx]  >= Power(2, c_nBitDepth - 1)) then
-//      pData.Left[nSampleIdx]  := pData.Left[nSampleIdx]  - Trunc(Power(2, c_nBitDepth));
-//
-//    if (pData.Right[nSampleIdx] >= Power(2, c_nBitDepth - 1)) then
-//      pData.Right[nSampleIdx] := pData.Right[nSampleIdx] - Trunc(Power(2, c_nBitDepth));
-//  end;
-//
-//  Result := TCasTrack.Create;
-//  Result.RawData := pData;
-//
-//  SetLength(a_aobInputPCMData, 0);
+    a_CasEngine.CalculateBuffers(@bufLeft, @bufRight);
+    SetLength(Result, Length(Result) + Length(bufLeft)  * c_nBytesInChannel +
+                                       Length(bufRight) * c_nBytesInChannel);
+
+    for nSmpIdx := 0 to Length(bufLeft) - 1 do
+    begin
+      for nByteIdx := 0 to c_nBytesInSample - 1 do
+      begin
+        bResult := IntBufferToPcm24(@bufLeft, @bufRight, nSmpIdx, nByteIdx);
+        Result[Length(Result) - (c_nBytesInSample - nByteIdx)] := bResult;
+      end;
+    end;
+  end;
 end;
 
 end.

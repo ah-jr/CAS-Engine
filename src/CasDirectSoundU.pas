@@ -34,7 +34,6 @@ type
 
     procedure InitializeVariables;
     procedure BufferCallback(nOffset : Cardinal);
-    function  ConvertSample (a_nSmpIdx, a_nByteIdx : Integer) : Byte;
     procedure CreateBuffer;
 
   public
@@ -67,6 +66,7 @@ uses
   MMSystem,
   Math,
   CasEngineU,
+  CasUtilsU,
   CasConstantsU;
 
 //==============================================================================
@@ -156,6 +156,7 @@ var
   nSmpIdx       : Integer;
   nByteIdx      : Integer;
   nSamples      : Integer;
+  bResult       : Byte;
 begin
   if m_bIsStarted then
   begin
@@ -187,7 +188,10 @@ begin
     for nSmpIdx := 0 to nSamples - 1 do
     begin
       for nByteIdx := 0 to c_nBytesInSample - 1 do
-        TByteArray(ptrAudio1^)[nSmpIdx*c_nBytesInSample + nByteIdx] := ConvertSample(nSmpIdx, nByteIdx);
+      begin
+        bResult := IntBufferToPcm24(@m_LeftBuffer, @m_RightBuffer, nSmpIdx, nByteIdx);
+        TByteArray(ptrAudio1^)[nSmpIdx*c_nBytesInSample + nByteIdx] := bResult;
+      end;
     end;
 
     //////////////////////////////////////////////////////////////////////////////
@@ -197,15 +201,6 @@ begin
                          ptrAudio2,
                          dwBytesAudio2);
   end;
-end;
-
-//==============================================================================
-function TCasDirectSound.ConvertSample(a_nSmpIdx, a_nByteIdx : Integer) : Byte;
-begin
-  if a_nByteIdx < c_nBytesInChannel then
-    Result := m_LeftBuffer [a_nSmpIdx] shr (8 * (a_nByteIdx))
-  else
-    Result := m_RightBuffer[a_nSmpIdx] shr (8 * (a_nByteIdx - c_nBytesInChannel));
 end;
 
 //==============================================================================
