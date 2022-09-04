@@ -117,7 +117,7 @@ begin
                   ' -ac 2 '                           +
                   'pipe:';
 
-    aobFiledata     := RunCommand(c_strFfmpegBin + ' ' + strCommand, 0);
+    aobFiledata     := RunCommand(c_strFfmpegBin + ' ' + strCommand, 0, True);
     Result          := DataToTrack(aobFiledata);
     Result.Title    := TPath.GetFileNameWithoutExtension(a_strFileName);
   except

@@ -14,8 +14,9 @@ uses
 function BoolToInt (a_bBool : Boolean) : Integer;
 function TimeString(a_nMiliSeconds : Int64 ; a_tmMeasure : TSecondSplit = spNone) : String;
 function GE_L      (a_nTarget, a_nFirst, a_nSecond : Integer) : Boolean;
-function RunCommand(a_strCommand : string; a_bStdIn : TBytes) : TBytes;
+function RunCommand(a_strCommand : string; a_bStdIn : TBytes; a_bRead : Boolean = False) : TBytes;
 function IntBufferToPcm24(bufLeft, bufRight : PIntArray; a_nSmpIdx, a_nByteIdx : Integer) : Byte;
+function AudioFormatToString(afFormat : TAudioFormat) : String;
 
 implementation
 
@@ -74,7 +75,7 @@ begin
 end;
 
 //==============================================================================
-function RunCommand(a_strCommand : string; a_bStdIn : TBytes) : TBytes;
+function RunCommand(a_strCommand : string; a_bStdIn : TBytes; a_bRead : Boolean = False) : TBytes;
 const
   c_nBufSize = 4096;
 var
@@ -120,13 +121,11 @@ begin
   if CreateProcess(nil, PChar(tmpProgram), nil, nil, True, CREATE_NO_WINDOW,
     nil, nil, tmpStartupInfo, tmpProcessInfo) then
   begin
-    CloseHandle(tmpProcessInfo.hProcess);
-    CloseHandle(tmpProcessInfo.hThread);
     CloseHandle(hdlStdOutWr);
     CloseHandle(hdlStdInRd);
 
     // Read from stdout
-    bReading := True;
+    bReading := a_bRead;
     dwRead   := 0;
     nDataIdx := 0;
 
@@ -145,13 +144,14 @@ begin
     // Write to stdin
     bWriting  := Length(a_bStdIn) > 0;
     dwWritten := 0;
+    nWrLength := 0;
     nDataIdx  := 0;
 
     while (bWriting) do
     begin
       for nBufIdx := 0 to c_nBufSize - 1 do
       begin
-        nWrLength := nBufIdx;
+        nWrLength := nBufIdx + 1;
         if nDataIdx >= Length(a_bStdIn) then Break;
 
         chBufIn[nBufIdx] := a_bStdIn[nDataIdx];
@@ -159,7 +159,15 @@ begin
       end;
 
       bWriting := WriteFile(hdlStdInWr, chBufIn, nWrLength, &dwWritten, nil);
+      bWriting := bWriting and (nDataIdx < Length(a_bStdIn));
     end;
+
+    CloseHandle(hdlStdOutRd);
+    CloseHandle(hdlStdInWr);
+
+    WaitForSingleObject(tmpProcessInfo.hProcess, INFINITE );
+    CloseHandle(tmpProcessInfo.hProcess);
+    CloseHandle(tmpProcessInfo.hThread);
   end
   else
   begin
@@ -174,6 +182,16 @@ begin
     Result := TIntArray(bufLeft^) [a_nSmpIdx] shr (8 * (a_nByteIdx))
   else
     Result := TIntArray(bufRight^)[a_nSmpIdx] shr (8 * (a_nByteIdx - c_nBytesInChannel));
+end;
+
+//==============================================================================
+function AudioFormatToString(afFormat : TAudioFormat) : String;
+begin
+  Result := '';
+  case afFormat of
+    afMp3 : Result := '.mp3';
+    afWav : Result := '.wav';
+  end;
 end;
 
 end.

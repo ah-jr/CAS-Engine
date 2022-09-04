@@ -50,17 +50,20 @@ function TCasEncoder.AudioExport(a_CasEngine : TCasEngine; a_asOut : TAudioSpecs
 var
   strCommand  : String;
   aobFiledata : TBytes;
+  strFullPath : String;
 const
   c_strFfmpegBin      = 'ffmpeg/ffmpeg.exe';
 begin
   Result := True;
+
+  strFullPath := a_strFileName + AudioFormatToString(a_asOut.Format);
 
   try
     aobFiledata := RenderToPcm(a_CasEngine);
     strCommand := '-f s24le -acodec pcm_s24le -ar ' +
                   a_asOut.SampleRate.ToString       +
                   ' -ac 2 -i pipe: "'               +
-                  a_strFileName + '"';
+                  strFullPath + '"';
 
     RunCommand(c_strFfmpegBin + ' ' + strCommand, aobFiledata);
   except
@@ -71,33 +74,34 @@ end;
 //==============================================================================
 function TCasEncoder.RenderToPcm(a_CasEngine : TCasEngine) : TBytes;
 var
-  bufLeft       : TIntArray;
-  bufRight      : TIntArray;
-  nLastPosition : Integer;
-  nSmpIdx       : Integer;
-  nByteIdx      : Integer;
-  bResult       : Byte;
+  bufLeft   : TIntArray;
+  bufRight  : TIntArray;
+  nSmpIdx   : Integer;
+  nByteIdx  : Integer;
+  nResIdx   : Integer;
+  nPosition : Integer;
+  bResult   : Byte;
 begin
-  SetLength(Result, 0);
+  nPosition := 0;
   a_CasEngine.SetPosition(0);
-  nLastPosition := 0;
+  SetLength(Result, a_CasEngine.Playlist.Length * c_nBytesInSample);
 
-  while a_CasEngine.GetPosition > nLastPosition do
+  while nPosition < Length(Result) do
   begin
-    nLastPosition := a_CasEngine.GetPosition;
-
     a_CasEngine.CalculateBuffers(@bufLeft, @bufRight);
-    SetLength(Result, Length(Result) + Length(bufLeft)  * c_nBytesInChannel +
-                                       Length(bufRight) * c_nBytesInChannel);
 
-    for nSmpIdx := 0 to Length(bufLeft) - 1 do
+    for nSmpIdx := 0 to a_CasEngine.BufferSize - 1 do
     begin
       for nByteIdx := 0 to c_nBytesInSample - 1 do
       begin
         bResult := IntBufferToPcm24(@bufLeft, @bufRight, nSmpIdx, nByteIdx);
-        Result[Length(Result) - (c_nBytesInSample - nByteIdx)] := bResult;
+        nResIdx := nPosition + nSmpIdx*c_nBytesInSample + nByteIdx;
+        if nResIdx < Length(Result) then
+          Result[nResIdx] := bResult;
       end;
     end;
+
+    Inc(nPosition, a_CasEngine.BufferSize * c_nBytesInSample);
   end;
 end;
 
