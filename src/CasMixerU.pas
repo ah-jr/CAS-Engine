@@ -40,8 +40,8 @@ type
     property Level  : Double         read m_dLevel    write m_dLevel;
     property Pan    : Double         read m_dPan      write m_dPan;
 
-    property Mixers : TList<Integer> read m_lstMixers write m_lstMixers;
-    property Tracks : TList<Integer> read m_lstTracks write m_lstTracks;
+    property Mixers : TList<Integer> read m_lstMixers;
+    property Tracks : TList<Integer> read m_lstTracks;
 
   end;
 

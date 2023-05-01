@@ -43,7 +43,7 @@ begin
   Result := 0;
 
   try
-    g_Engine  := TCasEngine.Create(nil, 0);
+    g_Engine  := TCasEngine.Create;
     g_Decoder := TCasDecoder.Create;
 
   except
@@ -71,18 +71,15 @@ end;
 //   ce_loadFile : Returns track's ID, or -1 if it fails
 function ce_loadFileIntoTrack(filename : PAnsiChar) : Integer;
 var
-  Track : TCasTrack;
+  Track : TTrackInfo;
 begin
   Result := -1;
 
   try
     if FileExists(String(filename)) then
     begin
-      Track    := g_Decoder.DecodeFile(String(filename), g_nSampleRate);
-      Track.ID := g_Engine.GenerateID;
-      g_Engine.AddTrack(Track, 0);
-
-      Result := Track.ID;
+      Track  := g_Decoder.DecodeFile(String(filename), g_nSampleRate);
+      Result := g_Engine.AddTrack(Track.Title, Track.Data, 0);
     end;
   except
   end;
@@ -93,7 +90,7 @@ begin
   Result := 1;
 
   try
-    g_Engine.AddTrackToPlaylist(trackID, 0);
+    g_Engine.Playlist.AddClip(trackID, 0);
   except
     Result := -1;
   end;

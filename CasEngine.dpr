@@ -9,6 +9,7 @@ uses
   CasAsioU        in 'src\CasAsioU.pas',
   CasDirectSoundU in 'src\CasDirectSoundU.pas',
   CasDsThreadU    in 'src\CasDsThreadU.pas',
+  CasClipU        in 'src\CasClipU.pas',
   CasTrackU       in 'src\CasTrackU.pas',
   CasMixerU       in 'src\CasMixerU.pas',
   CasPlaylistU    in 'src\CasPlaylistU.pas',

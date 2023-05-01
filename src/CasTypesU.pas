@@ -31,6 +31,17 @@ type
     Format     : TAudioFormat;
   end;
 
+  TRawData = record
+    Right : Array of Integer;
+    Left  : Array of Integer;
+  end;
+  PRawData = ^TRawData;
+
+  TTrackInfo = record
+    Title : String;
+    Data  : PRawData;
+  end;
+
   TIntArray = Array of Integer;
   PIntArray = ^TIntArray;
 

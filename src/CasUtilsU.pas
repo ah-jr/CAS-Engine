@@ -144,7 +144,6 @@ begin
     // Write to stdin
     bWriting  := Length(a_bStdIn) > 0;
     dwWritten := 0;
-    nWrLength := 0;
     nDataIdx  := 0;
 
     while (bWriting) do

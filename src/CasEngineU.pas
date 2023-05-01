@@ -6,7 +6,6 @@ uses
   Winapi.Windows,
   Winapi.Messages,
   System.Generics.Collections,
-  CasTrackU,
   CasConstantsU,
   CasTypesU,
   CasMixerU,
@@ -18,24 +17,22 @@ type
   TCasEngine = class(TObject)
 
   private
-    m_hwndHandle                 : HWND;
-    m_hwndOwner                  : HWND;
+    m_hwndHandle    : HWND;
+    m_hwndOwner     : HWND;
 
-    m_dtDriverType               : TDriverType;
-    m_AudioDriver                : IAudioDriver;
-    m_CasDatabase                : TCasDatabase;
-    m_CasPlaylist                : TCasPlaylist;
-    m_MainMixer                  : TCasMixer;
+    m_dtDriverType  : TDriverType;
+    m_AudioDriver   : IAudioDriver;
+    m_CasDatabase   : TCasDatabase;
+    m_CasPlaylist   : TCasPlaylist;
+    m_MainMixer     : TCasMixer;
 
-    m_tmrUpdateInfo              : TTimer;
-    m_bBufferSync                : Boolean;
-    m_nAsyncPos                  : Integer;
-    m_nUpdateCount               : Integer;
-    m_dtLastUpdate               : TDateTime;
-    m_bAsyncUpdate               : Boolean;
-    m_ptrCallback                : TCallbackExtern;
-
-    m_nIdCount                   : Integer;
+    m_tmrUpdateInfo : TTimer;
+    m_bBufferSync   : Boolean;
+    m_nAsyncPos     : Integer;
+    m_nUpdateCount  : Integer;
+    m_dtLastUpdate  : TDateTime;
+    m_bAsyncUpdate  : Boolean;
+    m_ptrCallback   : TCallbackExtern;
 
     procedure StartUpdate;
     procedure StopUpdate;
@@ -55,7 +52,7 @@ type
     procedure Stop;
     procedure Prev;
     procedure Next;
-    procedure GoToTrack(a_nID: Integer);
+    procedure GoToClip(a_nID: Integer);
 
     function  GetLevel      : Double;
     function  GetPosition   : Integer;
@@ -68,18 +65,14 @@ type
     function  GetTime       : String;
     function  GetDuration   : String;
     function  GenerateID    : Integer;
-
     function  GetTrackCount : Integer;
-    function  GetActiveTracks : TList<Integer>;
-    function  GetTrackProgress(a_nTrackId : Integer) : Double;
 
     procedure ControlPanel;
     procedure SetLevel     (a_dLevel : Double);
     procedure SetPosition  (a_nPosition : Integer);
     procedure ChangeDriver (a_dtDriverType : TDriverType; a_nID : Integer);
 
-    function  AddTrackToPlaylist(a_nTrackId, a_nPosition : Integer) : Boolean;
-    function  AddTrack(a_CasTrack : TCasTrack; a_nMixerId : Integer) : Boolean;
+    function  AddTrack(a_strTitle : String; a_pData : PRawData; a_nMixerId : Integer) : Integer;
     procedure DeleteTrack(a_nTrackId : Integer);
     procedure ClearTracks;
     procedure CalculateBuffers(a_LeftOut : PIntArray; a_RightOut : PIntArray);
@@ -110,13 +103,7 @@ type
     property SampleRate  : Double           read GetSampleRate;
     property BufferSize  : Cardinal         read GetBufferSize;
 
-    property ActiveTracks : TList<Integer> read GetActiveTracks;
-
-
   end;
-
-var
-  CasEngine: TCasEngine;
 
 implementation
 
@@ -128,6 +115,8 @@ uses
   CasDirectSoundU,
   CasAsioU,
   CasUtilsU,
+  CasTrackU,
+  CasClipU,
   DateUtils,
   Math;
 
@@ -157,8 +146,11 @@ end;
 
 //==============================================================================
 procedure TCasEngine.InitializeVariables;
+var
+  nIndex   : Integer;
+  CasMixer : TCasMixer;
 begin
-  CasEngine                := Self;
+  m_CasDatabase            := TCasDatabase.Create;
   m_hwndHandle             := AllocateHWnd(ProcessMessage);
 
   m_tmrUpdateInfo          := TTimer.Create(nil);
@@ -168,17 +160,23 @@ begin
 
   m_MainMixer              := TCasMixer.Create;
   m_MainMixer.ID           := GenerateId;
-  m_MainMixer.Level        := 1;
+  m_MainMixer.Level        := 0.5;
 
-  m_CasDatabase            := TCasDatabase.Create;
   m_CasDatabase.AddMixer(m_MainMixer);
   m_CasPlaylist            := TCasPlaylist.Create(m_CasDatabase);
   m_CasPlaylist.Position   := 0;
 
+  for nIndex := 0 to c_nDefMixerCount - 1 do
+  begin
+    CasMixer              := TCasMixer.Create;
+    CasMixer.ID           := GenerateId;
+    CasMixer.Level        := 0.5;
+    m_CasDatabase.AddMixer(CasMixer);
+  end;
+
   m_bAsyncUpdate           := False;
   m_nAsyncPos              := 0;
   m_nUpdateCount           := 0;
-  m_nIdCount               := 0;
   m_AudioDriver            := nil;
   m_ptrCallback            := nil;
   m_dtDriverType           := dtNone;
@@ -254,20 +252,6 @@ begin
 end;
 
 //==============================================================================
-function TCasEngine.AddTrackToPlaylist(a_nTrackId, a_nPosition : Integer) : Boolean;
-var
-  CasTrack : TCasTrack;
-begin
-  Result := m_CasDatabase.GetTrackById(a_nTrackId, CasTrack);
-
-  if Result then
-  begin
-    CasTrack.Position := a_nPosition;
-    m_CasPlaylist.AddTrack(a_nTrackId);
-  end;
-end;
-
-//==============================================================================
 procedure TCasEngine.DeleteTrack(a_nTrackId : Integer);
 begin
   m_CasPlaylist.RemoveTrack(a_nTrackId);
@@ -275,19 +259,23 @@ begin
 end;
 
 //==============================================================================
-function TCasEngine.AddTrack(a_CasTrack : TCasTrack; a_nMixerId : Integer) : Boolean;
+function TCasEngine.AddTrack(a_strTitle : String; a_pData : PRawData; a_nMixerId : Integer) : Integer;
 var
   CasMixer : TCasMixer;
+  CasTrack : TCasTrack;
 begin
-  Result := False;
+  CasTrack         := TCasTrack.Create;
+  CasTrack.Title   := a_strTitle;
+  CasTrack.RawData := a_pData;
+  CasTrack.ID      := GenerateID;
+
+  Result := -1;
 
   if m_CasDatabase.GetMixerById(a_nMixerId, CasMixer) then
   begin
-    if CasMixer.Tracks.IndexOf(a_CasTrack.ID) < 0 then
-      CasMixer.AddTrack(a_CasTrack.ID);
-
-    m_CasDatabase.AddTrack(a_CasTrack);
-    Result := True;
+    CasMixer.AddTrack(CasTrack.ID);
+    m_CasDatabase.AddTrack(CasTrack);
+    Result := CasTrack.ID;
   end;
 end;
 
@@ -352,11 +340,15 @@ var
   nBufEndPos  : Integer;
   dGap        : Double;
   CasTrack    : TCasTrack;
+  CasClip     : TCasClip;
   CasMixer    : TCasMixer;
   LeftMaster  : TIntArray;
   RightMaster : TIntArray;
   LeftTrack   : TIntArray;
   RightTrack  : TIntArray;
+  nClipIdx    : Integer;
+  nClipID     : Integer;
+  nStart      : Integer;
 
   //////////////////////////////////////////////////////////////////////////////
   ///  This procedure requires initialized data
@@ -412,30 +404,40 @@ begin
     for nMixerIdx := 0 to m_CasDatabase.Mixers.Count - 1 do
     begin
       CasMixer := m_CasDatabase.Mixers.Items[nMixerIdx];
+      // For each track, get all clips:
       for nTrackIdx := 0 to CasMixer.Tracks.Count - 1 do
       begin
         nTrackID := CasMixer.Tracks.Items[nTrackIdx];
         if m_CasDatabase.GetTrackById(nTrackID, CasTrack) then
         begin
-          // If the track's position is not -1, it's in the playlist:
-          if (CasTrack.Position >= 0) then
+          // For each clip, add data to the buffer:
+          for nClipIdx := 0 to CasTrack.Clips.Count - 1 do
           begin
-            // If track is within buffer range its data is added:
-            nPosition := Trunc(m_CasPlaylist.RelPos) - CasTrack.Position;
-            if (nPosition + nBufInSize >= 0) then
-              AddTrackToBuffer;
+            nClipID := CasTrack.Clips[nClipIdx];
+            
+            if m_CasPlaylist.IsClipPlaying(nClipID) then
+            begin
+              if m_CasPlaylist.GetClip(nClipID, CasClip) then
+              begin
+                // If track is within buffer range its data is added:
+                nStart    := CasClip.Pos - CasClip.Start;
+                nPosition := Trunc(m_CasPlaylist.RelPos) - nStart;
+                if (nPosition + nBufInSize >= 0) then
+                  AddTrackToBuffer;
 
-            // If playlist reached the end but the buffer still not full, the
-            // tracks at the beginning are added too:
-            nBufEndPos := m_CasPlaylist.Position + nBufInSize - m_CasPlaylist.Length;
-            nPosition  := Trunc(m_CasPlaylist.RelPos) - (CasTrack.Position + m_CasPlaylist.Length);
-            if (nBufEndPos >= 0) and (CasTrack.Position < nBufEndPos) then
-              AddTrackToBuffer;
+                // If playlist reached the end but the buffer still not full, the
+                // tracks at the beginning are added too:
+                nBufEndPos := m_CasPlaylist.Position + nBufInSize - m_CasPlaylist.Length;
+                nPosition  := Trunc(m_CasPlaylist.RelPos) - (nStart + m_CasPlaylist.Length);
+                if (nBufEndPos >= 0) and (nStart < nBufEndPos) then
+                  AddTrackToBuffer;
 
-            // Note: theoretically there could be a buffer that is two or more
-            // times bigger than the track's length, in that case we should add
-            // the track more times in the same buffer. That could be a future
-            // improvement.
+                // Note: theoretically there could be a buffer that is two or more
+                // times bigger than the track's length, in that case we should add
+                // the track more times in the same buffer. That could be a future
+                // improvement.
+              end;
+            end;
           end;
         end;
       end;
@@ -500,44 +502,22 @@ end;
 
 //==============================================================================
 procedure TCasEngine.Prev;
-var
-  nIndex : Integer;
-  nPos   : Integer;
 begin
-  nPos := 0;
-
-  for nIndex := 0 to m_CasDatabase.Tracks.Count - 1 do
-  begin
-    if (m_CasDatabase.Tracks.Items[nIndex].Position < m_CasPlaylist.Position) then
-      nPos := Max(nPos, m_CasDatabase.Tracks.Items[nIndex].Position);
-  end;
-
-  m_CasPlaylist.Position := nPos;
-  m_nAsyncPos := nPos;
+  m_CasPlaylist.GoToPrevClip;
+  m_nAsyncPos := m_CasPlaylist.Position;
 end;
 
 //==============================================================================
 procedure TCasEngine.Next;
-var
-  nIndex : Integer;
-  nPos   : Integer;
 begin
-  nPos := MaxInt;
-
-  for nIndex := 0 to m_CasDatabase.Tracks.Count - 1 do
-  begin
-    if (m_CasDatabase.Tracks.Items[nIndex].Position > m_CasPlaylist.Position) then
-      nPos := Min(nPos, m_CasDatabase.Tracks.Items[nIndex].Position);
-  end;
-
-  m_CasPlaylist.Position := nPos;
-  m_nAsyncPos := nPos;
+  m_CasPlaylist.GoToNextClip;
+  m_nAsyncPos := m_CasPlaylist.Position;
 end;
 
 //==============================================================================
-procedure TCasEngine.GoToTrack(a_nID: Integer);
+procedure TCasEngine.GoToClip(a_nID: Integer);
 begin
-  m_CasPlaylist.GoToTrack(a_nID);
+  m_CasPlaylist.GoToClip(a_nID);
   m_nAsyncPos := m_CasPlaylist.Position;
 end;
 
@@ -556,8 +536,7 @@ end;
 //==============================================================================
 function TCasEngine.GenerateID : Integer;
 begin
-  Result := m_nIdCount;
-  Inc(m_nIdCount);
+  Result := m_CasDatabase.GenerateID;
 end;
 
 //==============================================================================
@@ -653,29 +632,6 @@ end;
 function TCasEngine.GetTrackCount : Integer;
 begin
   Result := m_CasDatabase.Tracks.Count;
-end;
-
-//==============================================================================
-function TCasEngine.GetActiveTracks : TList<Integer>;
-begin
-  Result := m_CasPlaylist.ActiveTracks;
-end;
-
-//==============================================================================
-function TCasEngine.GetTrackProgress(a_nTrackId : Integer) : Double;
-var
-  CasTrack  : TCasTrack;
-  nPosition : Integer;
-begin
-  Result := -1;
-
-  if m_CasDatabase.GetTrackById(a_nTrackId, CasTrack) then
-  begin
-    nPosition := Trunc(Position - CasTrack.Position);
-
-    if CasTrack.IsPlaying(Position) then
-      Result := nPosition/CasTrack.Size;
-  end;
 end;
 
 //==============================================================================

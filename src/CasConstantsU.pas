@@ -25,6 +25,8 @@ const
   c_nBytesInChannel = 3;
   c_nBytesInSample  = 6;
 
+  c_nDefMixerCount  = 100;
+
   // Numerical
   FLT_EPS    = 0.000001;
   HOUR_SEC   = 3600;

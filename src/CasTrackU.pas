@@ -3,24 +3,20 @@ unit CasTrackU;
 interface
 
 uses
+  System.Generics.Collections,
   Winapi.Windows,
-  Winapi.Messages;
+  Winapi.Messages,
+  CasTypesU;
 
 type
-  TRawData = record
-    Right : Array of Integer;
-    Left  : Array of Integer;
-  end;
-  PRawData = ^TRawData;
-
   TCasTrack = class
 
   private
-    m_nID       : Integer;
-    m_strTitle  : String;
-    m_nPosition : Integer;
-    m_dLevel    : Double;
-    m_RawData   : PRawData;
+    m_nID          : Integer;
+    m_strTitle     : String;
+    m_dLevel       : Double;
+    m_RawData      : PRawData;
+    m_lstClips     : TList<Integer>;
 
     //procedure Normalize;
     function  GetSize : Integer;
@@ -28,16 +24,19 @@ type
   public
     constructor Create;
     destructor  Destroy; override;
-    function  Clone   : TCasTrack;
-    function  IsPlaying(a_dPosition : Double) : Boolean;
 
-    property ID          : Integer  read m_nID         write m_nID;
-    property Title       : String   read m_strTitle    write m_strTitle;
-    property Position    : Integer  read m_nPosition   write m_nPosition;
+    function  Clone   : TTrackInfo;
 
-    property RawData     : PRawData read m_RawData     write m_RawData;
-    property Level       : Double   read m_dLevel      write m_dLevel;
-    property Size        : Integer  read GetSize;
+    procedure AddClip   (a_nClipID : Integer);
+    procedure RemoveClip(a_nClipID : Integer);
+
+    property ID        : Integer               read m_nID          write m_nID;
+    property Title     : String                read m_strTitle     write m_strTitle;
+
+    property RawData   : PRawData              read m_RawData      write m_RawData;
+    property Level     : Double                read m_dLevel       write m_dLevel;
+    property Size      : Integer               read GetSize;
+    property Clips     : TList<Integer>        read m_lstClips;
 
   end;
 
@@ -52,9 +51,10 @@ constructor TCasTrack.Create;
 begin
   m_nID       := -1;
   m_strTitle  := '';
-  m_nPosition := -1;
   m_dLevel    := 1;
   m_RawData   := nil;
+
+  m_lstClips  := TList<Integer>.Create;
 end;
 
 //==============================================================================
@@ -64,20 +64,19 @@ begin
   begin
     SetLength(m_RawData.Left,  0);
     SetLength(m_RawData.Right, 0);
+
+    Dispose(m_RawData);
   end;
 
-  Dispose(m_RawData);
+  m_lstClips.Free;
 end;
 
 //==============================================================================
-function TCasTrack.Clone : TCasTrack;
+function TCasTrack.Clone : TTrackInfo;
 var
   pData : PRawData;
 begin
-  Result       := TCasTrack.Create;
-  Result.ID    := -1;
   Result.Title := m_strTitle;
-  Result.Level := m_dLevel;
 
   New(pData);
 
@@ -87,13 +86,19 @@ begin
   Move(m_RawData.Left [0], pData.Left [0], GetSize * SizeOf(Integer));
   Move(m_RawData.Right[0], pData.Right[0], GetSize * SizeOf(Integer));
 
-  Result.RawData := pData;
+  Result.Data := pData;
 end;
 
 //==============================================================================
-function TCasTrack.IsPlaying(a_dPosition : Double) : Boolean;
+procedure TCasTrack.AddClip(a_nClipID : Integer);
 begin
-  Result := (m_nPosition < a_dPosition) and (m_nPosition + Size > a_dPosition);
+  m_lstClips.Add(a_nClipID);
+end;
+
+//==============================================================================
+procedure TCasTrack.RemoveClip(a_nClipID : Integer);
+begin
+  m_lstClips.Remove(a_nClipID);
 end;
 
 ////==============================================================================

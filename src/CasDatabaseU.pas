@@ -19,6 +19,8 @@ type
     m_dctTracks : TDictionary<Integer, TCasTrack>;
     m_dctMixers : TDictionary<Integer, TCasMixer>;
 
+    m_nIdCount  : Integer;
+
   public
     constructor Create;
     destructor  Destroy; override;
@@ -34,11 +36,13 @@ type
 
     function  GetTrackByTitle(a_strTitle : String; var a_Castrack : TCasTrack) : Boolean;
 
+    function  GenerateID : Integer;
+
     procedure ClearTracks;
     procedure ClearMixers;
 
-    property Mixers : TList<TCasMixer> read m_lstMixers write m_lstMixers;
-    property Tracks : TList<TCasTrack> read m_lstTracks write m_lstTracks;
+    property Mixers : TList<TCasMixer> read m_lstMixers;
+    property Tracks : TList<TCasTrack> read m_lstTracks;
 
   end;
 
@@ -51,12 +55,14 @@ uses
 constructor TCasDatabase.Create;
 begin
   // Remember to always keep the list and dictionary equal. They should contain
-  // the same tracks/mixers.
+  // the same objects.
   m_lstTracks := TList<TCasTrack>.Create;
   m_lstMixers := TList<TCasMixer>.Create;
 
   m_dctTracks := TDictionary<Integer, TCasTrack>.Create;
   m_dctMixers := TDictionary<Integer, TCasMixer>.Create;
+
+  m_nIdCount  := 0;
 end;
 
 //==============================================================================
@@ -77,6 +83,15 @@ begin
   m_dctMixers.Free;
 
   Inherited;
+end;
+
+//==============================================================================
+// Generate ID's for any CAS object
+//==============================================================================
+function TCasDatabase.GenerateID : Integer;
+begin
+  Result := m_nIdCount;
+  Inc(m_nIdCount);
 end;
 
 //==============================================================================

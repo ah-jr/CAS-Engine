@@ -96,6 +96,7 @@
         <DCCReference Include="src\CasAsioU.pas"/>
         <DCCReference Include="src\CasDirectSoundU.pas"/>
         <DCCReference Include="src\CasDsThreadU.pas"/>
+        <DCCReference Include="src\CasClipU.pas"/>
         <DCCReference Include="src\CasTrackU.pas"/>
         <DCCReference Include="src\CasMixerU.pas"/>
         <DCCReference Include="src\CasPlaylistU.pas"/>

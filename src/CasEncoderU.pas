@@ -9,8 +9,7 @@ uses
   CasEngineU,
   CasTypesU,
   Classes,
-  Windows,
-  CasTrackU;
+  Windows;
 
 type
   TCasEncoder = class
