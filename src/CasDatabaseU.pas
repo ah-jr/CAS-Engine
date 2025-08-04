@@ -119,6 +119,7 @@ begin
 
     CasTrack.Free;
 
+    m_dctMixers[CasTrack.MixerID].RemoveTrack(CasTrack.ID);
     m_dctTracks.Remove(a_nID);
   end;
 end;

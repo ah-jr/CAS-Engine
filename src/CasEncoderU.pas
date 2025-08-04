@@ -64,7 +64,7 @@ begin
                   ' -ac 2 -i pipe: "'               +
                   strFullPath + '"';
 
-    RunCommand(c_strFfmpegBin + ' ' + strCommand, aobFiledata);
+    RunCommand(c_strFfmpegBin + ' ' + strCommand, @aobFiledata);
   except
     Result := False;
   end;

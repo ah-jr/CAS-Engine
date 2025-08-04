@@ -14,7 +14,7 @@ uses
 function BoolToInt (a_bBool : Boolean) : Integer;
 function TimeString(a_nMiliSeconds : Int64 ; a_tmMeasure : TSecondSplit = spNone) : String;
 function GE_L      (a_nTarget, a_nFirst, a_nSecond : Integer) : Boolean;
-function RunCommand(a_strCommand : string; a_bStdIn : TBytes; a_bRead : Boolean = False) : TBytes;
+function RunCommand(a_strCommand : string; a_bStdIn : PBytes; a_bRead : Boolean = False) : TBytes;
 function IntBufferToPcm24(bufLeft, bufRight : PIntArray; a_nSmpIdx, a_nByteIdx : Integer) : Byte;
 function AudioFormatToString(afFormat : TAudioFormat) : String;
 
@@ -75,7 +75,7 @@ begin
 end;
 
 //==============================================================================
-function RunCommand(a_strCommand : string; a_bStdIn : TBytes; a_bRead : Boolean = False) : TBytes;
+function RunCommand(a_strCommand : string; a_bStdIn : PBytes; a_bRead : Boolean = False) : TBytes;
 const
   c_nBufSize = 4096;
 var
@@ -142,7 +142,7 @@ begin
     end;
 
     // Write to stdin
-    bWriting  := Length(a_bStdIn) > 0;
+    bWriting  := (a_bStdIn <> nil) and (Length(a_bStdIn^) > 0);
     dwWritten := 0;
     nDataIdx  := 0;
 
@@ -151,14 +151,14 @@ begin
       for nBufIdx := 0 to c_nBufSize - 1 do
       begin
         nWrLength := nBufIdx + 1;
-        if nDataIdx >= Length(a_bStdIn) then Break;
+        if nDataIdx >= Length(a_bStdIn^) then Break;
 
-        chBufIn[nBufIdx] := a_bStdIn[nDataIdx];
+        chBufIn[nBufIdx] := a_bStdIn^[nDataIdx];
         Inc(nDataIdx);
       end;
 
       bWriting := WriteFile(hdlStdInWr, chBufIn, nWrLength, &dwWritten, nil);
-      bWriting := bWriting and (nDataIdx < Length(a_bStdIn));
+      bWriting := bWriting and (nDataIdx < Length(a_bStdIn^));
     end;
 
     CloseHandle(hdlStdOutRd);

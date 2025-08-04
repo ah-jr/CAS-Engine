@@ -15,7 +15,7 @@ type
     m_nID          : Integer;
     m_nTrackID     : Integer;
     m_nPosition    : Integer;
-    m_nStart       : Integer;
+    m_nOffset      : Integer;
     m_nSize        : Integer;
 
   public
@@ -23,20 +23,23 @@ type
 
     destructor  Destroy; override;
 
-    function GetSize    : Integer;
-    function GetPos     : Integer;
-    function GetStart   : Integer;
-    function GetLastPos : Integer;
+    function GetSize     : Integer;
+    function GetOffset   : Integer;
+    function GetStartPos : Integer;
+    function GetEndPos   : Integer;
 
-    procedure SetSize (a_nSize  : Integer);
-    procedure SetPos  (a_nPos   : Integer);
-    procedure SetStart(a_nStart : Integer);
+    procedure SetSize    (a_nSize     : Integer);
+    procedure SetStartPos(a_nStartPos : Integer);
+    procedure SetOffset  (a_nOffset   : Integer);
+
+    procedure SetLeftBound (a_nPos : Integer);
+    procedure SetRightBound(a_nPos : Integer);
 
     property ID          : Integer      read m_nID;
     property TrackID     : Integer      read m_nTrackID;
-    property LastPos     : Integer      read GetLastPos;
-    property Pos         : Integer      read GetPos       write SetPos;
-    property Start       : Integer      read GetStart     write SetStart;
+    property EndPos      : Integer      read GetEndPos;
+    property StartPos    : Integer      read GetStartPos  write SetStartPos;
+    property Offset      : Integer      read GetOffset    write SetOffset;
     property Size        : Integer      read GetSize      write SetSize;
 
   end;
@@ -53,7 +56,7 @@ begin
   m_nID          := a_nID;
   m_nTrackID     := a_nTrackID;
   m_nPosition    := 0;
-  m_nStart       := 0;
+  m_nOffset      := 0;
   m_nSize        := 0;
 end;
 
@@ -70,19 +73,19 @@ begin
 end;
 
 //==============================================================================
-function TCasClip.GetPos : Integer;
+function TCasClip.GetStartPos : Integer;
 begin
   Result := m_nPosition;
 end;
 
 //==============================================================================
-function TCasClip.GetStart : Integer;
+function TCasClip.GetOffset : Integer;
 begin
-  Result := m_nStart;
+  Result := m_nOffset;
 end;
 
 //==============================================================================
-function TCasClip.GetLastPos : Integer;
+function TCasClip.GetEndPos : Integer;
 begin
   Result := m_nPosition + m_nSize;
 end;
@@ -94,20 +97,32 @@ begin
 end;
 
 //==============================================================================
-procedure TCasClip.SetPos(a_nPos : Integer);
+procedure TCasClip.SetStartPos(a_nStartPos : Integer);
 begin
-  m_nPosition := a_nPos;
+  m_nPosition := a_nStartPos;
 end;
 
 //==============================================================================
-procedure TCasClip.SetStart(a_nStart : Integer);
+procedure TCasClip.SetOffset(a_nOffset : Integer);
+begin
+  m_nOffset   := a_nOffset;
+end;
+
+//==============================================================================
+procedure TCasClip.SetLeftBound(a_nPos : Integer);
 var
   nDif : Integer;
 begin
-  nDif        := a_nStart - m_nStart;
-  m_nStart    := a_nStart;
-  m_nPosition := m_nPosition + nDif;
+  nDif        := a_nPos - m_nPosition;
+  m_nPosition := a_nPos;
+  m_nOffset   := m_nOffset + nDif;
   m_nSize     := m_nSize - nDif;
+end;
+
+//==============================================================================
+procedure TCasClip.SetRightBound(a_nPos : Integer);
+begin
+  m_nSize := a_nPos - m_nPosition;
 end;
 
 end.

@@ -2,12 +2,18 @@
 CAS-Engine's PATCH NOTES 
 ==============================================================================
 
-v1.7
+v1.8:
 
-  - Made GetTrackProgress async compatible
-  - Added methods to get info for active tracks
+  - Optimizations in memory and performance.
+  - Added TSampleMinMax to assist wave painting.
+  - Main Mixer (bus) logic added.
 
-v1.6
+v1.7:
+
+  - Made GetTrackProgress async compatible.
+  - Added methods to get info for active tracks.
+
+v1.6:
 
   - Created a DLL for the engine with a simple wrapper (CasDllWrapper.pas).
     See examples/playAudio.cpp to learn how to use it.
@@ -22,13 +28,13 @@ v1.6
   - Created AsyncDecodeFile, which uses a new thread to decode and prevents
     the app from halting when loading files.
   - Separated CasEngineU from actual driver implementations.
-  - New method for getting time/duration
+  - New method for getting time/duration.
 
-v1.5
+v1.5:
 
   - Created clone procedure for TCasTrack.
   - Fixed possible invalid memory access in TCasTrack.Destroy. 
-  - New 'previous' and 'next' functionalities in TCasPlaylist
+  - New 'previous' and 'next' functionalities in TCasPlaylist.
 
 v1.4:
 

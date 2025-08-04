@@ -13,16 +13,18 @@ type
 
   private
     m_nID          : Integer;
+    m_nMixerID     : Integer;
     m_strTitle     : String;
     m_dLevel       : Double;
     m_RawData      : PRawData;
+    m_MinMax       : TSampleMinMax;
     m_lstClips     : TList<Integer>;
 
     //procedure Normalize;
     function  GetSize : Integer;
 
   public
-    constructor Create;
+    constructor Create(a_pData : PRawData);
     destructor  Destroy; override;
 
     function  Clone   : TTrackInfo;
@@ -31,10 +33,11 @@ type
     procedure RemoveClip(a_nClipID : Integer);
 
     property ID        : Integer               read m_nID          write m_nID;
+    property MixerID   : Integer               read m_nMixerID     write m_nMixerID;
     property Title     : String                read m_strTitle     write m_strTitle;
-
-    property RawData   : PRawData              read m_RawData      write m_RawData;
     property Level     : Double                read m_dLevel       write m_dLevel;
+    property RawData   : PRawData              read m_RawData;
+    property MinMax    : TSampleMinMax         read m_MinMax;
     property Size      : Integer               read GetSize;
     property Clips     : TList<Integer>        read m_lstClips;
 
@@ -47,13 +50,15 @@ uses
   CasConstantsU;
 
 //==============================================================================
-constructor TCasTrack.Create;
+constructor TCasTrack.Create(a_pData : PRawData);
 begin
   m_nID       := -1;
+  m_nMixerID  := -1;
   m_strTitle  := '';
   m_dLevel    := 1;
-  m_RawData   := nil;
+  m_RawData   := a_pData;
 
+  m_MinMax    := TSampleMinMax.Create(@a_pData.Right);
   m_lstClips  := TList<Integer>.Create;
 end;
 
@@ -68,6 +73,7 @@ begin
     Dispose(m_RawData);
   end;
 
+  m_MinMax.Free;
   m_lstClips.Free;
 end;
 

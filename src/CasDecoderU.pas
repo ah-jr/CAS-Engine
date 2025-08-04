@@ -26,7 +26,7 @@ type
     constructor Create;
     destructor Destroy; override;
 
-    function  GetTrackData   (a_aobInputPCMData : TBytes) : PRawData;
+    function  GetTrackData   (a_aobInputPCMData : PBytes) : PRawData;
     function  DecodeFile     (a_strFileName : String; a_dSampleRate : Double) : TTrackInfo;
     procedure AsyncDecodeFile(a_hwndCaller : HWND; a_lstFiles : TStrings; a_dSampleRate : Double);
 
@@ -113,14 +113,14 @@ begin
                   'pipe:';
 
     aobFiledata     := RunCommand(c_strFfmpegBin + ' ' + strCommand, nil, True);
-    Result.Data     := GetTrackData(aobFiledata);
+    Result.Data     := GetTrackData(@aobFiledata);
     Result.Title    := TPath.GetFileNameWithoutExtension(a_strFileName);
   except
   end;
 end;
 
 //==============================================================================
-function TCasDecoder.GetTrackData(a_aobInputPCMData : TBytes) : PRawData;
+function TCasDecoder.GetTrackData(a_aobInputPCMData : PBytes) : PRawData;
 var
   nSampleIdx         : Integer;
   nByteIdx           : Integer;
@@ -131,7 +131,7 @@ var
 begin
   New(pData);
 
-  nSize := Length(a_aobInputPCMData) div c_nBytesInSample;
+  nSize := Length(a_aobInputPCMData^) div c_nBytesInSample;
 
   SetLength(pData.Left,  nSize);
   SetLength(pData.Right, nSize);
@@ -141,8 +141,8 @@ begin
   begin
     for nByteIdx := 0 to c_nBytesInChannel - 1  do
     begin
-      nLeftChannelBytes  := a_aobInputPCMData[c_nBytesInSample * nSampleIdx + nByteIdx];
-      nRightChannelBytes := a_aobInputPCMData[c_nBytesInSample * nSampleIdx + nByteIdx + c_nBytesInChannel];
+      nLeftChannelBytes  := a_aobInputPCMData^[c_nBytesInSample * nSampleIdx + nByteIdx];
+      nRightChannelBytes := a_aobInputPCMData^[c_nBytesInSample * nSampleIdx + nByteIdx + c_nBytesInChannel];
 
       pData.Left[nSampleIdx]  := pData.Left[nSampleIdx]  + nLeftChannelBytes  * Trunc(Power(2, c_nByteSize * nByteIdx));
       pData.Right[nSampleIdx] := pData.Right[nSampleIdx] + nRightChannelBytes * Trunc(Power(2, c_nByteSize * nByteIdx));
@@ -156,7 +156,7 @@ begin
       pData.Right[nSampleIdx] := pData.Right[nSampleIdx] - Trunc(Power(2, c_nBitDepth));
   end;
 
-  SetLength(a_aobInputPCMData, 0);
+  SetLength(a_aobInputPCMData^, 0);
   Result := pData;
 end;
 

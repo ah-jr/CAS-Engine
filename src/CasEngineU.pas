@@ -72,7 +72,8 @@ type
     procedure SetPosition  (a_nPosition : Integer);
     procedure ChangeDriver (a_dtDriverType : TDriverType; a_nID : Integer);
 
-    function  AddTrack(a_strTitle : String; a_pData : PRawData; a_nMixerId : Integer) : Integer;
+    function  AddTrack(a_strTitle : String; a_pData : PRawData; a_nMixerId : Integer = -1) : Integer;
+    procedure ChangeTracksMixer(a_nTrackId : Integer; a_nMixerId : Integer);
     procedure DeleteTrack(a_nTrackId : Integer);
     procedure ClearTracks;
     procedure CalculateBuffers(a_LeftOut : PIntArray; a_RightOut : PIntArray);
@@ -160,7 +161,7 @@ begin
 
   m_MainMixer              := TCasMixer.Create;
   m_MainMixer.ID           := GenerateId;
-  m_MainMixer.Level        := 0.5;
+  m_MainMixer.Level        := 0.75;
 
   m_CasDatabase.AddMixer(m_MainMixer);
   m_CasPlaylist            := TCasPlaylist.Create(m_CasDatabase);
@@ -170,8 +171,9 @@ begin
   begin
     CasMixer              := TCasMixer.Create;
     CasMixer.ID           := GenerateId;
-    CasMixer.Level        := 0.5;
+    CasMixer.Level        := 0.75;
     m_CasDatabase.AddMixer(CasMixer);
+    m_MainMixer.AddMixer(CasMixer.ID);
   end;
 
   m_bAsyncUpdate           := False;
@@ -252,6 +254,26 @@ begin
 end;
 
 //==============================================================================
+procedure TCasEngine.ChangeTracksMixer(a_nTrackId : Integer; a_nMixerId : Integer);
+var
+  OldCasMixer : TCasMixer;
+  NewCasMixer : TCasMixer;
+  CasTrack    : TCasTrack;
+begin
+  if not m_CasDatabase.GetTrackById(a_nTrackId, CasTrack) then
+    Exit;
+
+  if not m_CasDatabase.GetMixerById(a_nMixerId, NewCasMixer) then
+    Exit;
+
+  if m_CasDatabase.GetMixerById(CasTrack.MixerId, OldCasMixer) then
+    OldCasMixer.RemoveTrack(CasTrack.ID);
+
+  NewCasMixer.AddTrack(CasTrack.ID);
+  CasTrack.MixerID := a_nMixerId;
+end;
+
+//==============================================================================
 procedure TCasEngine.DeleteTrack(a_nTrackId : Integer);
 begin
   m_CasPlaylist.RemoveTrack(a_nTrackId);
@@ -264,18 +286,20 @@ var
   CasMixer : TCasMixer;
   CasTrack : TCasTrack;
 begin
-  CasTrack         := TCasTrack.Create;
+  CasTrack         := TCasTrack.Create(a_pData);
   CasTrack.Title   := a_strTitle;
-  CasTrack.RawData := a_pData;
   CasTrack.ID      := GenerateID;
 
-  Result := -1;
+  m_CasDatabase.AddTrack(CasTrack);
+  Result := CasTrack.ID;
+
+  if a_nMixerId < 0 then
+    Exit;
 
   if m_CasDatabase.GetMixerById(a_nMixerId, CasMixer) then
   begin
     CasMixer.AddTrack(CasTrack.ID);
-    m_CasDatabase.AddTrack(CasTrack);
-    Result := CasTrack.ID;
+    CasTrack.MixerID := a_nMixerId;
   end;
 end;
 
@@ -336,6 +360,7 @@ var
   nTrackIdx   : Integer;
   nTrackID    : Integer;
   nMixerIdx   : Integer;
+  nMixerID    : Integer;
   nBufInSize  : Integer;
   nBufEndPos  : Integer;
   dGap        : Double;
@@ -368,10 +393,10 @@ var
     for nBufferIdx := 0 to nBufInSize - 1 do
     begin
       LeftMaster [nBufferIdx] := LeftMaster[nBufferIdx]  +
-        Trunc(CasMixer.Level * LeftTrack [nBufferIdx]);
+        Trunc(m_MainMixer.Level * CasMixer.Level * LeftTrack [nBufferIdx]);
 
       RightMaster[nBufferIdx] := RightMaster[nBufferIdx] +
-        Trunc(CasMixer.Level * RightTrack[nBufferIdx]);
+        Trunc(m_MainMixer.Level * CasMixer.Level * RightTrack[nBufferIdx]);
     end;
   end;
 
@@ -401,41 +426,44 @@ begin
     end;
 
     // For each mixer, get all linked tracks:
-    for nMixerIdx := 0 to m_CasDatabase.Mixers.Count - 1 do
+    for nMixerIdx := 0 to m_MainMixer.GetMixers.Count - 1 do
     begin
-      CasMixer := m_CasDatabase.Mixers.Items[nMixerIdx];
-      // For each track, get all clips:
-      for nTrackIdx := 0 to CasMixer.Tracks.Count - 1 do
+      nMixerID := m_MainMixer.GetMixers.Items[nMixerIdx];
+      if m_CasDatabase.GetMixerById(nMixerID, CasMixer) then
       begin
-        nTrackID := CasMixer.Tracks.Items[nTrackIdx];
-        if m_CasDatabase.GetTrackById(nTrackID, CasTrack) then
+        // For each track, get all clips:
+        for nTrackIdx := 0 to CasMixer.Tracks.Count - 1 do
         begin
-          // For each clip, add data to the buffer:
-          for nClipIdx := 0 to CasTrack.Clips.Count - 1 do
+          nTrackID := CasMixer.Tracks.Items[nTrackIdx];
+          if m_CasDatabase.GetTrackById(nTrackID, CasTrack) then
           begin
-            nClipID := CasTrack.Clips[nClipIdx];
-            
-            if m_CasPlaylist.IsClipPlaying(nClipID) then
+            // For each clip, add data to the buffer:
+            for nClipIdx := 0 to CasTrack.Clips.Count - 1 do
             begin
-              if m_CasPlaylist.GetClip(nClipID, CasClip) then
+              nClipID := CasTrack.Clips[nClipIdx];
+            
+              if m_CasPlaylist.IsClipInBuffer(nClipID, nBufInSize) then
               begin
-                // If track is within buffer range its data is added:
-                nStart    := CasClip.Pos - CasClip.Start;
-                nPosition := Trunc(m_CasPlaylist.RelPos) - nStart;
-                if (nPosition + nBufInSize >= 0) then
-                  AddTrackToBuffer;
+                if m_CasPlaylist.GetClip(nClipID, CasClip) then
+                begin
+                  // If track is within buffer range its data is added:
+                  nStart    := CasClip.StartPos - CasClip.Offset;
+                  nPosition := Trunc(m_CasPlaylist.RelPos) - nStart;
+                  if (nPosition + nBufInSize >= 0) then
+                    AddTrackToBuffer;
 
-                // If playlist reached the end but the buffer still not full, the
-                // tracks at the beginning are added too:
-                nBufEndPos := m_CasPlaylist.Position + nBufInSize - m_CasPlaylist.Length;
-                nPosition  := Trunc(m_CasPlaylist.RelPos) - (nStart + m_CasPlaylist.Length);
-                if (nBufEndPos >= 0) and (nStart < nBufEndPos) then
-                  AddTrackToBuffer;
+                  // If playlist reached the end but the buffer still not full, the
+                  // tracks at the beginning are added too:
+                  nBufEndPos := m_CasPlaylist.Position + nBufInSize - m_CasPlaylist.Length;
+                  nPosition  := Trunc(m_CasPlaylist.RelPos) - (nStart + m_CasPlaylist.Length);
+                  if (nBufEndPos >= 0) and (nStart < nBufEndPos) then
+                    AddTrackToBuffer;
 
-                // Note: theoretically there could be a buffer that is two or more
-                // times bigger than the track's length, in that case we should add
-                // the track more times in the same buffer. That could be a future
-                // improvement.
+                  // Note: theoretically there could be a buffer that is two or more
+                  // times bigger than the track's length, in that case we should add
+                  // the track more times in the same buffer. That could be a future
+                  // improvement.
+                end;
               end;
             end;
           end;

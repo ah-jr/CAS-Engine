@@ -30,7 +30,7 @@ type
     constructor Create(a_CasDatabase: TCasDatabase);
     destructor  Destroy; override;
 
-    procedure SetClipPos (a_nClipID  : Integer; a_nPos: Integer; a_nStart: Integer = -1; a_nSize: Integer = -1);
+    procedure SetClipPos (a_nClipID  : Integer; a_nPos: Integer; a_nOffset: Integer = -1; a_nSize: Integer = -1);
     procedure GoToClip   (a_nClipID  : Integer);
     procedure RemoveClip (a_nClipID  : Integer);
     procedure RemoveTrack(a_nTrackID : Integer);
@@ -39,13 +39,14 @@ type
     procedure GoToNextClip;
     procedure GoToPrevClip;
 
-    function AddClip(a_nTrackID: Integer; a_nPos: Integer = 0; a_nStart: Integer = 0; a_nSize: Integer = -1) : Integer;
+    function AddClip(a_nTrackID: Integer; a_nPos: Integer = 0; a_nOffset: Integer = 0; a_nSize: Integer = -1) : Integer;
 
     function GetClip        (a_nClipID  : Integer; var a_nClip : TCasClip) : Boolean;
     function GetClipSize    (a_nClipID  : Integer) : Integer;
     function GetClipProgress(a_nClipID  : Integer) : Double;
     function IsClipPlaying  (a_nClipID  : Integer) : Boolean;
     function IsTrackPlaying (a_nTrackID : Integer) : Boolean;
+    function IsClipInBuffer (a_nClipID  : Integer; a_nBuffer : Integer) : Boolean;
 
     function GetTrackList    : TList<Integer>;
     function GetActiveTracks : TList<Integer>;
@@ -121,7 +122,7 @@ begin
   nMaxSize := 0;
 
   for Item in m_dctClips do
-    nMaxSize := Max(Item.Value.LastPos, nMaxSize);
+    nMaxSize := Max(Item.Value.EndPos, nMaxSize);
 
   Result := nMaxSize;
 end;
@@ -135,8 +136,24 @@ begin
 
   if m_dctClips.TryGetValue(a_nClipID, Clip) then
   begin
-    Result := (Clip.Pos     <= m_dPosition) and
-              (Clip.LastPos >= m_dPosition);
+    Result := (Clip.StartPos <= m_dPosition) and
+              (Clip.EndPos   >= m_dPosition);
+  end;
+end;
+
+//==============================================================================
+function TCasPlaylist.IsClipInBuffer(a_nClipID : Integer; a_nBuffer : Integer) : Boolean;
+var
+  Clip : TCasClip;
+begin
+  Result := False;
+
+  if m_dctClips.TryGetValue(a_nClipID, Clip) then
+  begin
+    Result := ((Clip.StartPos <= m_dPosition) and
+               (Clip.EndPos   >= m_dPosition)) or
+              ((Clip.StartPos <= m_dPosition + a_nBuffer) and
+               (Clip.EndPos   >= m_dPosition + a_nBuffer));
   end;
 end;
 
@@ -153,8 +170,8 @@ begin
     Clip := Item.Value;
 
     Result := ((Clip.TrackID = a_nTrackID) and
-               (Clip.Pos     <= m_dPosition) and
-               (Clip.LastPos >= m_dPosition));
+               (Clip.StartPos <= m_dPosition) and
+               (Clip.EndPos   >= m_dPosition));
 
     if Result then
       Break;
@@ -188,7 +205,7 @@ begin
 
   if m_dctClips.TryGetValue(a_nClipID, Clip) then
   begin
-    nPos := Trunc(Position - Clip.Pos);
+    nPos := Trunc(Position - Clip.StartPos);
 
     if IsClipPlaying(Clip.ID) then
       Result := nPos/(Clip.Size);
@@ -267,7 +284,7 @@ begin
 end;
 
 //==============================================================================
-function TCasPlaylist.AddClip(a_nTrackID: Integer; a_nPos: Integer; a_nStart: Integer; a_nSize: Integer) : Integer;
+function TCasPlaylist.AddClip(a_nTrackID: Integer; a_nPos: Integer; a_nOffset: Integer; a_nSize: Integer) : Integer;
 var
   CasTrack : TCasTrack;
   Clip     : TCasClip;
@@ -276,12 +293,12 @@ begin
 
   if m_CasDatabase.GetTrackById(a_nTrackID, CasTrack) then
   begin
-    Clip       := TCasClip.Create(m_CasDatabase.GenerateID, a_nTrackID);
-    Clip.Pos   := a_nPos;
-    Clip.Start := a_nStart;
+    Clip          := TCasClip.Create(m_CasDatabase.GenerateID, a_nTrackID);
+    Clip.StartPos := a_nPos;
+    Clip.Offset   := a_nOffset;
 
     if a_nSize = -1 then
-      Clip.Size := CasTrack.Size - a_nStart
+      Clip.Size := CasTrack.Size - a_nOffset
     else
       Clip.Size := a_nSize;
 
@@ -355,16 +372,16 @@ begin
 end;
 
 //==============================================================================
-procedure TCasPlaylist.SetClipPos(a_nClipID : Integer; a_nPos: Integer; a_nStart: Integer; a_nSize: Integer);
+procedure TCasPlaylist.SetClipPos(a_nClipID : Integer; a_nPos: Integer; a_nOffset: Integer; a_nSize: Integer);
 var
   Clip : TCasClip;
 begin
   if m_dctClips.TryGetValue(a_nClipID, Clip) then
   begin
-    Clip.Pos := a_nPos;
+    Clip.StartPos := a_nPos;
 
-    if a_nStart >= 0 then
-      Clip.Start := a_nStart;
+    if a_nOffset >= 0 then
+      Clip.Offset := a_nOffset;
 
     if a_nSize >= 0 then
       Clip.Size := a_nSize
@@ -378,7 +395,7 @@ var
 begin
   if m_dctClips.TryGetValue(a_nClipID, Clip) then
   begin
-    Position := Clip.Pos;
+    Position := Clip.StartPos;
   end;
 end;
 
@@ -395,7 +412,7 @@ begin
 
   for Item in m_dctClips do
   begin
-    nStart := Item.Value.Pos;
+    nStart := Item.Value.StartPos;
 
     if (nStart > Position) and ((nStart - Position) < nDiff) then
     begin
@@ -420,7 +437,7 @@ begin
 
   for Item in m_dctClips do
   begin
-    nStart := Item.Value.Pos;
+    nStart := Item.Value.StartPos;
 
     if (nStart < Position) and ((Position - nStart) < nDiff) then
     begin
